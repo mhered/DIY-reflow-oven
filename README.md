@@ -1,0 +1,88 @@
+# DIY reflow oven
+
+Inspired in [this video](https://www.youtube.com/watch?v=asZ1zhef8Ss) (see also the [blog post](https://www.digikey.com/en/maker/projects/how-to-build-a-solder-reflow-oven/6c52df4782084f8d97c62d1349df058f)) but the BOM was too expensive
+
+Bought the following instead:
+
+| Qty  | Item                                                         | Image                        | Description                                                  | Link                                          | Pack Price (€) | Pack Size | Unit Price (€) | Subtotal (€) |
+| ---- | ------------------------------------------------------------ | ---------------------------- | ------------------------------------------------------------ | --------------------------------------------- | -------------- | --------- | -------------- | ------------ |
+| 1    | [ARCELI MAX6675 module + K-type thermocouple](./BOM/sensor.md) | ![](./BOM/assets/sensor.jpg) | K-type thermocouple module with MAX6675, 0–600 °C range, SPI output | [Amazon](https://www.amazon.es/dp/B07MY36P9Y) | 7.99           | 1         | 7.99           | 7.99         |
+| 1    | [SSR-50DA Solid State Relay](./BOM/ssr.md)                   | ![](./BOM/assets/SSR.jpg)    | DC 3–32 V input, AC 24–380 V output, 50A max, for heater control | [Amazon](https://www.amazon.es/dp/B08FX1DDJM) | 9.59           | 1         | 9.59           | 9.59         |
+| 1    | [Cecotec Bake&Toast 1090 Oven](./BOM/oven.md)                | ![](./BOM/assets/oven.jpg)   | 10 L tabletop oven, 1000 W, 60 min timer, up to 230 °C       | [Amazon](https://www.amazon.es/dp/B0BQ13YSVT) | 31.90          | 1         | 31.90          | 31.90        |
+
+Also used a Raspberry Pico and an OLED I had around
+
+## Step 1
+
+Target: display the temperature on the OLED using a micropython script
+
+Inspired in this source video: https://www.youtube.com/watch?v=aUPvASe8D-w
+
+### Flashing MicroPython onto the Pico
+
+We'll use [Thonny](https://thonny.org/) (a python IDE beginners with great MicroPython integration). 
+
+1. Install and run:
+
+```bash
+$ sudo apt install thonny
+$ thonny
+```
+
+2. plug the Pico in boot mode: while holding down the **BOOTSEL** button on the Pico, connect the USB cable to your computer, and a new drive will appear: **RPI-RP2**
+
+3. flash MicroPython on the Pico: 
+   1. Go to **Tools** > **Options**
+   2. In the **Interpreter** tab select **"MicroPython (Raspberry Pi Pico)"** in the dropdown and click **"Install or update MicroPython"**. Thonny will detect the Pico automatically. 
+   3. Select variant **"Raspberry Pi Pico W / Pico WH"**. It will download and flash the **MicroPython UF2 file** automatically.
+   4. Click **Install** and wait for it to finish![](./assets/install_micropython.png)
+   5. After install, the Pico will reboot and connect directly to Thonny — you’ll see the MicroPython REPL (>>>) at the bottom.
+
+
+
+### Pico WH pinout
+
+![](./assets/pico-2-pinout.svg)
+
+### Wiring the voltage divider
+
+```
+3.3V --- [10kΩ] ---+--- [10K Thermistor] --- GND
+                   |
+                GPIO26 (ADC 0)
+```
+
+### Wiring the SSD1306 OLED to the Pico
+
+| OLED Pin | Connect To Pico | Pico Pin Number | Function |
+| -------- | --------------- | --------------- | -------- |
+| `VCC`    | 3.3V            | Pin 36          | Power    |
+| `GND`    | GND             | Pin 38 or 3     | Ground   |
+| `SCK`    | GP1             | Pin 2           | I²C0 SCL |
+| `SDA`    | GP0             | Pin 1           | I²C0 SDA |
+
+### Result
+
+![](./assets/thermistor_bb.png)
+
+### Pico Firmware
+
+The script `main.py` contains the main function.
+
+Copy dependencies to the pico:
+
+* `ssd1306.py` - library to communicate with the OLED (copied from https://github.com/stlehmann/micropython-ssd1306)
+* `writer.py` - an interpreter for custom fonts. T
+* `freesans20.py` - a custom large font for the OLED 
+
+The files from https://github.com/peterhinch/micropython-font-to-py did not work for me, so I copied them instead from the link in the commens of this video: https://www.youtube.com/watch?v=bLXMVTTPFMs
+
+
+
+## Sources
+
+* [Freenove_Ultimate_Starter_Kit_for_Raspberry_Pi](https://github.com/Freenove/Freenove_Ultimate_Starter_Kit_for_Raspberry_Pi) - a kit I use, the repo has tutorials, specs of the components etc 
+
+* [Online Steinhart-Hart model coefficients calculator]( https://www.thinksrs.com/downloads/programs/therm%20calc/ntccalibrator/ntccalculator.html) - needs R measurements at 3 known T points
+* [Another video](https://www.youtube.com/watch?v=k9xzGO0SVg0) -  discusses temp curves, has a custom controller PCB
+
