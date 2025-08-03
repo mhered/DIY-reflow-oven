@@ -2,7 +2,7 @@
 
 Inspired in [this video](https://www.youtube.com/watch?v=asZ1zhef8Ss) (see also the [blog post](https://www.digikey.com/en/maker/projects/how-to-build-a-solder-reflow-oven/6c52df4782084f8d97c62d1349df058f)) but the BOM was too expensive
 
-Bought the following instead:
+Bought the following elements instead:
 
 | Qty  | Item                                                         | Image                        | Description                                                  | Link                                          | Pack Price (€) | Pack Size | Unit Price (€) | Subtotal (€) |
 | ---- | ------------------------------------------------------------ | ---------------------------- | ------------------------------------------------------------ | --------------------------------------------- | -------------- | --------- | -------------- | ------------ |
@@ -10,17 +10,17 @@ Bought the following instead:
 | 1    | [SSR-50DA Solid State Relay](./BOM/ssr.md)                   | ![](./BOM/assets/SSR.jpg)    | DC 3–32 V input, AC 24–380 V output, 50A max, for heater control | [Amazon](https://www.amazon.es/dp/B08FX1DDJM) | 9.59           | 1         | 9.59           | 9.59         |
 | 1    | [Cecotec Bake&Toast 1090 Oven](./BOM/oven.md)                | ![](./BOM/assets/oven.jpg)   | 10 L tabletop oven, 1000 W, 60 min timer, up to 230 °C       | [Amazon](https://www.amazon.es/dp/B0BQ13YSVT) | 31.90          | 1         | 31.90          | 31.90        |
 
-Also used a Raspberry Pico and an OLED I had around
+Also used a Raspberry Pico WH and a SSD1306 OLED screen I had around
 
-## Step 1
+## Step 1 - Measure temp and show it on the OLED
 
-Target: display the temperature on the OLED using a micropython script
+Target: display the temperature on the OLED using a MicroPython script
 
 Inspired in this source video: https://www.youtube.com/watch?v=aUPvASe8D-w
 
 ### Flashing MicroPython onto the Pico
 
-We'll use [Thonny](https://thonny.org/) (a python IDE beginners with great MicroPython integration). 
+I used [Thonny](https://thonny.org/) (a python IDE for beginners with great MicroPython integration). 
 
 1. Install and run:
 
@@ -29,18 +29,18 @@ $ sudo apt install thonny
 $ thonny
 ```
 
-2. plug the Pico in boot mode: while holding down the **BOOTSEL** button on the Pico, connect the USB cable to your computer, and a new drive will appear: **RPI-RP2**
+2. plug the RPi Pico in boot mode: while holding down the **BOOTSEL** button on the RPi Pico, connect the USB cable to your computer, and a new drive will appear: **RPI-RP2**
 
-3. flash MicroPython on the Pico: 
+3. flash MicroPython on the RPi Pico: 
    1. Go to **Tools** > **Options**
-   2. In the **Interpreter** tab select **"MicroPython (Raspberry Pi Pico)"** in the dropdown and click **"Install or update MicroPython"**. Thonny will detect the Pico automatically. 
+   2. In the **Interpreter** tab select **"MicroPython (Raspberry Pi Pico)"** in the dropdown and click **"Install or update MicroPython"**. Thonny will detect the RPi Pico automatically. 
    3. Select variant **"Raspberry Pi Pico W / Pico WH"**. It will download and flash the **MicroPython UF2 file** automatically.
    4. Click **Install** and wait for it to finish![](./assets/install_micropython.png)
-   5. After install, the Pico will reboot and connect directly to Thonny — you’ll see the MicroPython REPL (>>>) at the bottom.
+   5. After install, the RPi Pico will reboot and connect directly to Thonny — you’ll see the MicroPython REPL (>>>) at the bottom.
 
 
 
-### Pico WH pinout
+### RPi Pico WH pinout
 
 ![](./assets/pico-2-pinout.svg)
 
@@ -67,17 +67,31 @@ $ thonny
 
 ### Pico Firmware
 
-The script `main.py` contains the main function.
+* `main.py` - main function.
+* `display.py` - functions to send info to the OLED display  
+* `thermistor.py` -  functions to read the sensor
 
 Copy dependencies to the pico:
 
 * `ssd1306.py` - library to communicate with the OLED (copied from https://github.com/stlehmann/micropython-ssd1306)
-* `writer.py` - an interpreter for custom fonts. T
+* `writer.py` - an interpreter for custom fonts for the OLED
 * `freesans20.py` - a custom large font for the OLED 
 
-The files from https://github.com/peterhinch/micropython-font-to-py did not work for me, so I copied them instead from the link in the commens of this video: https://www.youtube.com/watch?v=bLXMVTTPFMs
+Note: the files from https://github.com/peterhinch/micropython-font-to-py did not work for me, so I copied them instead from the link in the comments of this video: https://www.youtube.com/watch?v=bLXMVTTPFMs
 
+## Step 2  - setup a web server over WiFi to interact from computer or phone
 
+* `wifi.py` : function to connect the RPi Pico to Wifi
+* `secrets.py`: contains network information
+
+```bash
+SSID = "Network"
+PASSWORD = "Password"
+```
+
+* `server.py` :  a very basic web server
+
+![](./assets/server_v1.png)
 
 ## Sources
 
