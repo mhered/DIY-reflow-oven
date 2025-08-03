@@ -93,6 +93,15 @@ PASSWORD = "Password"
 
 ![](./assets/server_v1.png)
 
+Next we refactor using [Microdot](https://github.com/miguelgrinberg/microdot) framework and add a few improvements:
+
+* replace repeated full-page reload every 2 seconds using meta-refresh with polling a tiny JSON file using Java Script. This is more efficient, avoids page flicker and is more extensible 
+* save web page as static files (`index.html` and `style.css`) with a minimalistic, modern design
+* Add `/set_target?value=XX` route to update target temperature via HTTP
+* Add REST endpoint `/temperature` exposing current and target temp + heater state
+
+![](./assets/server_v2.png)
+
 ## Sources
 
 * [Freenove_Ultimate_Starter_Kit_for_Raspberry_Pi](https://github.com/Freenove/Freenove_Ultimate_Starter_Kit_for_Raspberry_Pi) - a kit I use, the repo has tutorials, specs of the components etc 

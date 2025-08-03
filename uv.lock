@@ -1,0 +1,23 @@
+version = 1
+revision = 3
+requires-python = ">=3.12"
+
+[[package]]
+name = "diy-reflow-oven"
+version = "0.1.0"
+source = { virtual = "." }
+dependencies = [
+    { name = "microdot" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "microdot", specifier = ">=2.3.3" }]
+
+[[package]]
+name = "microdot"
+version = "2.3.3"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/c4/56/d8e31324a8f2e8044f90df3025e23bf66f26a3f1d3ee2b6dc6f59f912ca4/microdot-2.3.3.tar.gz", hash = "sha256:a0492d92d7bdf562c87c0670e5026a47a8b08e705b5e746a0cfecf5afd223781", size = 77034, upload-time = "2025-07-01T22:48:55.935Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/c8/c0/f75fea3992c07a3f36bd0a4e59804c4f0e1322b2334bb66ca21104d9356d/microdot-2.3.3-py3-none-any.whl", hash = "sha256:754dee3a48fb800095d662717db3f0e2c4f009aece16b21151d94e6be949bfba", size = 41189, upload-time = "2025-07-01T22:48:54.418Z" },
+]
