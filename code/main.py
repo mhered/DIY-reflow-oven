@@ -62,6 +62,12 @@ while True:
     last_temperature = temperature
 
     # Use heater class to control heating logic - heater now manages its own target
+    # Check if profile manager has an active profile and update target accordingly
+    profile_target = server.update_profiles()
+    if profile_target is not None:
+        # Profile is active, use profile target
+        heater.set_target_temp(profile_target)
+
     heater_on = heater.set_state(temperature)
 
     # Update current temperature and heater state
