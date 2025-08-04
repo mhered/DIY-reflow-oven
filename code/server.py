@@ -93,7 +93,7 @@ class WebServer:
                     return {'status': 'error', 'message': 'Profile name required'}, 400
                 
                 if self.profile_manager.start_profile(profile_name):
-                    return {'status': 'ok', 'message': f'Started profile: {profile_name}'}
+                    return {'status': 'ok', 'message': 'Started profile: {}'.format(profile_name)}
                 else:
                     return {'status': 'error', 'message': 'Profile not found'}, 404
             
