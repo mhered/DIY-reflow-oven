@@ -58,8 +58,8 @@ class TemperaturePhase:
             name=data['name'],
             start_temp=data['start_temp'],
             end_temp=data['end_temp'],
-            duration_minutes=data.get('duration_minutes'),
-            climb_rate_per_minute=data.get('climb_rate_per_minute')
+            duration_minutes=data.get('duration_minutes') if 'duration_minutes' in data else None,
+            climb_rate_per_minute=data.get('climb_rate_per_minute') if 'climb_rate_per_minute' in data else None
         )
 
 
@@ -124,16 +124,29 @@ class TemperatureProfile:
         return cls(name=data['name'], phases=phases)
     
     def save_to_file(self, filepath):
-        """Save profile to JSON file"""
-        with open(filepath, 'w') as f:
-            json.dump(self.to_dict(), f, indent=2)
+        """Save profile to JSON file - MicroPython compatible"""
+        try:
+            with open(filepath, 'w') as f:
+                # Don't use indent parameter as it might not be supported in MicroPython
+                json_str = json.dumps(self.to_dict())
+                f.write(json_str)
+        except Exception as e:
+            print("Error saving profile: {}".format(e))
+            raise
     
     @classmethod
     def load_from_file(cls, filepath):
-        """Load profile from JSON file"""
-        with open(filepath, 'r') as f:
-            data = json.load(f)
-        return cls.from_dict(data)
+        """Load profile from JSON file - MicroPython compatible"""
+        try:
+            with open(filepath, 'r') as f:
+                content = f.read()
+                if not content.strip():
+                    raise ValueError("File is empty")
+                data = json.loads(content)
+            return cls.from_dict(data)
+        except Exception as e:
+            print("Error loading profile from {}: {}".format(filepath, e))
+            raise
 
 
 # Example profiles for testing
