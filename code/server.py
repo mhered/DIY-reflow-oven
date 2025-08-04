@@ -2,12 +2,12 @@ from microdot import Microdot, Response, send_file
 import _thread
 
 class WebServer:
-    def __init__(self):
+    def __init__(self, heater):
         self.app = Microdot()
         Response.default_content_type = 'application/json'
-
+        
+        self.heater = heater  # Reference to heater for target temp operations
         self.current_temp = 0.0
-        self.target_temp = 25.0  # Default value
         self.heater_on = False  # Track heater state
 
         self.setup_routes()
@@ -31,20 +31,24 @@ class WebServer:
             """ Get current, target temperature and heater state """
             return {
                 'temp': round(self.current_temp, 1),
-                'target': round(self.target_temp, 1),
-                'heater_on': self.heater_on
+                'target': round(self.heater.get_target_temp(), 1),
+                'heater_on': self.heater_on,
+                'limits': self.heater.get_temp_limits()
             }
 
         @self.app.route('/set_target')
         def set_target(request):
             """ Set the target temperature via query parameter """
             try:
-                value = float(request.args.get('value', self.target_temp))
-                self.target_temp = value
-                print(f"Target temperature set to {self.target_temp}")
-                return {'status': 'ok', 'target': self.target_temp}
-            except:
-                return {'status': 'error'}, 400
+                value = float(request.args.get('value', self.heater.get_target_temp()))
+                result = self.heater.set_target_temp(value)
+                
+                if isinstance(result, tuple):  # Error case
+                    return result[0], result[1]
+                else:  # Success case
+                    return result
+            except ValueError:
+                return {'status': 'error', 'message': 'Invalid temperature value'}, 400
 
     def serve_temperature_once(self, temp):
         """Called from main.py to update the current temperature reading for the web interface"""

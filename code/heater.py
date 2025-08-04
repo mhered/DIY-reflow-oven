@@ -5,7 +5,11 @@ and extensible for future PID/hysteresis implementations
 """
 
 class Heater:
-    def __init__(self, pin=None, hysteresis=1.0):
+    def __init__(self, pin=None, 
+                 hysteresis=1.0,
+                 min_temp=0.0, 
+                 max_temp=300.0,
+                 target_temp=25.0):
         """
         Initialize heater controller
         
@@ -14,10 +18,14 @@ class Heater:
             hysteresis: Temperature difference for hysteresis control (°C)
         """
         self.pin = pin
-        self.hysteresis = hysteresis
+        self.hysteresis = hysteresis   
+        self.min_temp = min_temp
+        self.max_temp = max_temp
+        self.target_temp = target_temp
+
         self.is_on = False
         self.last_state = False
-        
+
         # Initialize GPIO if pin is provided
         if self.pin:
             try:
@@ -30,18 +38,23 @@ class Heater:
         else:
             self.heater_pin = None
     
-    def set_state(self, current_temp, target_temp):
+    def set_state(self, current_temp, target_temp=None):
         """
         Update heater state based on current and target temperatures
         Uses simple hysteresis control to prevent rapid on/off cycling
         
         Args:
             current_temp (float): Current temperature reading
-            target_temp (float): Desired target temperature
+            target_temp (float): Optional override for target temperature.
+                                If None, uses the heater's stored target_temp
             
         Returns:
             bool: True if heater should be on, False otherwise
         """
+        # Use provided target or fall back to stored target
+        if target_temp is None:
+            target_temp = self.target_temp
+        
         # Simple hysteresis control
         if not self.is_on:
             # Turn on if temperature is below target minus hysteresis
@@ -89,3 +102,30 @@ class Heater:
         """
         self.hysteresis = max(0.1, hysteresis)  # Minimum 0.1°C hysteresis
         print(f"Hysteresis set to {self.hysteresis}°C")
+
+    def set_target_temp(self, value):
+        """Set target temperature with validation"""
+        if self.min_temp <= value <= self.max_temp:
+            self.target_temp = value
+            print(f"Target temperature set to {self.target_temp}°C")
+            return {'status': 'ok', 'target': self.target_temp}
+        else:
+            return {'status': 'error', 'message': f'Target out of range ({self.min_temp}-{self.max_temp}°C)'}, 400
+    
+    def get_target_temp(self):
+        """Get current target temperature"""
+        return self.target_temp
+    
+    def get_temp_limits(self):
+        """Get temperature limits"""
+        return {'min': self.min_temp, 'max': self.max_temp}
+    
+    def get_status(self):
+        """Get complete heater status"""
+        return {
+            'target_temp': self.target_temp,
+            'is_on': self.is_on,
+            'hysteresis': self.hysteresis,
+            'min_temp': self.min_temp,
+            'max_temp': self.max_temp
+        }

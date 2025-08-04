@@ -14,7 +14,8 @@ sensor = Thermistor(pin = SENSOR_PIN)
 
 # initialize heater controller
 HEATER_PIN = 22
-heater = Heater(pin = HEATER_PIN)
+DEFAULT_TARGET_TEMP = 25.0
+heater = Heater(pin=HEATER_PIN, target_temp=DEFAULT_TARGET_TEMP)
 
 # Connect to Wi-Fi
 ip_address = connect()
@@ -26,16 +27,18 @@ display = Display()
 display.show_message("Online at:", ip_address)
 
 # Start web server
-server = WebServer()
+server = WebServer(heater)
 
 time.sleep(5)
 
-
+# Temperature Simulation parameters
 INITIAL_TEMP = 25 	# C
 NOISE = 0.1 		# C
 HEATING = 0.4 		# C/sec
 COOLING = -0.3 		# C/sec
 last_temperature = INITIAL_TEMP
+
+# Time to wait between temperature updates
 WAIT = 1 			# sec
 
 # Main loop
@@ -51,14 +54,19 @@ while True:
         temperature = sensor.read_temp()
     last_temperature = temperature
 
-     # Use heater class to control heating logic
-    heater_on = heater.set_state(temperature, server.target_temp)
+     # Use heater class to control heating logic - heater now manages its own target
+    heater_on = heater.set_state(temperature)
 
+    # Update current temperature and heater state
+    
+    # in OLED display
     display.show_temp("Temperature", temperature, heater_on)
-
+    
+    # in web server
     server.serve_temperature_once(temperature)
     server.serve_heater_state_once(heater_on)
 
+    # in stdout
     print("Temp:", temperature)
 
     time.sleep(WAIT)

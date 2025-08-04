@@ -19,7 +19,7 @@ class Display:
 
             # if heater is on display an icon
             if heater_on:
-                self.oled.text("ON", 50, 30)
+                self.oled.text("ON", 80, 30)
 
         else:
             self.oled.text("NaN", 5, 5)

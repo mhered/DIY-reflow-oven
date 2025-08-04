@@ -14,22 +14,99 @@
         .then(res => res.json())
         .then(data => {
           document.getElementById("currentTemp").innerText = data.temp + " °C";
+          
+          // Update target input with current target from server
+          const targetInput = document.getElementById("targetInput");
+          if (targetInput.value != data.target) {
+            targetInput.value = data.target;
+          }
+          
+          // Update temperature limits dynamically
+          if (data.limits) {
+            targetInput.min = data.limits.min;
+            targetInput.max = data.limits.max;
+          }
 
           const heaterIcon = document.getElementById("heaterStatus");
           if (data.heater_on) {
-            heaterIcon.style.display = "block";
+            heaterIcon.style.display = "inline";
           } else {
             heaterIcon.style.display = "none";
           }
+        })
+        .catch(error => {
+          console.error('Error fetching temperature:', error);
+          document.getElementById("currentTemp").innerText = "Error";
         });
     }
 
     function setTarget() {
       const val = document.getElementById("targetInput").value;
-      fetch('/set_target?value=' + val);
+      fetch('/set_target?value=' + val)
+        .then(res => res.json())
+        .then(data => {
+          if (data.status === 'ok') {
+            console.log('Target set to:', data.target);
+            // Show success feedback
+            showFeedback('Target set to ' + data.target + '°C', 'success');
+          } else {
+            console.error('Error setting target:', data.message || 'Unknown error');
+            showFeedback(data.message || 'Error setting target temperature', 'error');
+          }
+        })
+        .catch(error => {
+          console.error('Error setting target:', error);
+          showFeedback('Network error setting target temperature', 'error');
+        });
+    }
+
+    function loadTemperatureLimits() {
+      // Temperature limits are now loaded dynamically from the server
+      // in the updateTemp() function, so this is just a placeholder
+      // for any future initialization logic
+      console.log('Temperature limits will be loaded from server...');
+    }
+
+    function showFeedback(message, type) {
+      // Create or update feedback element
+      let feedback = document.getElementById("feedback");
+      if (!feedback) {
+        feedback = document.createElement("div");
+        feedback.id = "feedback";
+        feedback.style.cssText = `
+          margin: 10px 0;
+          padding: 10px;
+          border-radius: 4px;
+          text-align: center;
+          font-weight: bold;
+        `;
+        document.querySelector(".container").appendChild(feedback);
+      }
+      
+      feedback.textContent = message;
+      feedback.className = type; // 'success' or 'error'
+      
+      if (type === 'success') {
+        feedback.style.backgroundColor = '#d4edda';
+        feedback.style.color = '#155724';
+        feedback.style.border = '1px solid #c3e6cb';
+      } else {
+        feedback.style.backgroundColor = '#f8d7da';
+        feedback.style.color = '#721c24';
+        feedback.style.border = '1px solid #f5c6cb';
+      }
+      
+      // Clear feedback after 3 seconds
+      setTimeout(() => {
+        feedback.textContent = '';
+        feedback.style.display = 'none';
+      }, 3000);
+      
+      feedback.style.display = 'block';
     }
 
     window.onload = () => {
+      loadTemperatureLimits();
       updateTemp();
       interval = setInterval(updateTemp, 2000);
     };
@@ -47,8 +124,8 @@
       </div>
     </div>
 
-    <label for="targetInput">Target Temperature</label>
-    <input type="number" id="targetInput" value="25" min="0" max="300">
+    <label for="targetInput">Target Temperature (°C)</label>
+    <input type="number" id="targetInput" value="25" min="0" max="300" step="1">
     <button onclick="setTarget()">Set Target</button>
   </div>
 </body>
