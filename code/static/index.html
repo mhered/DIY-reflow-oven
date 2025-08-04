@@ -1,27 +1,28 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>IoT Temperature Dashboard</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Temperature Dashboard</title>
   <link rel="stylesheet" href="/style.css">
   <script>
     let interval = null;
 
-function updateTemp() {
-  fetch('/temperature')
-    .then(res => res.json())
-    .then(data => {
-      document.getElementById("currentTemp").innerText = data.temp + " °C";
+    function updateTemp() {
+      fetch('/temperature')
+        .then(res => res.json())
+        .then(data => {
+          document.getElementById("currentTemp").innerText = data.temp + " °C";
 
-      const heaterIcon = document.getElementById("heaterStatus");
-      if (data.heater_on) {
-        heaterIcon.style.display = "block";
-      } else {
-        heaterIcon.style.display = "none";
-      }
-    });
-}
+          const heaterIcon = document.getElementById("heaterStatus");
+          if (data.heater_on) {
+            heaterIcon.style.display = "block";
+          } else {
+            heaterIcon.style.display = "none";
+          }
+        });
+    }
 
     function setTarget() {
       const val = document.getElementById("targetInput").value;
@@ -34,16 +35,22 @@ function updateTemp() {
     };
   </script>
 </head>
+
 <body>
   <div class="container">
     <h1>Temperature</h1>
-    <div class="temperature" id="currentTemp">--</div>
-    
-    <div id="heaterStatus" style="font-size: 2rem; display: none;">🔥</div>
+  
+    <div class="temperature">
+      <div class="temp-wrapper">
+        <span id="currentTemp">--</span>
+        <span id="heaterStatus">🔥</span>
+      </div>
+    </div>
 
     <label for="targetInput">Target Temperature</label>
-    <input type="number" id="targetInput" value="25" min="0" max="100">
+    <input type="number" id="targetInput" value="25" min="0" max="300">
     <button onclick="setTarget()">Set Target</button>
   </div>
 </body>
+
 </html>

@@ -8,6 +8,7 @@ class WebServer:
 
         self.current_temp = 0.0
         self.target_temp = 25.0  # Default value
+        self.heater_on = False  # Track heater state
 
         self.setup_routes()
 
@@ -17,23 +18,26 @@ class WebServer:
     def setup_routes(self):
         @self.app.route('/')
         def index(request):
+            """ Serve the main HTML page """
             return send_file('static/index.html')
 
         @self.app.route('/style.css')
         def style(request):
+            """ Serve CSS file for styling the web interface """
             return send_file('static/style.css')
 
         @self.app.route('/temperature')
         def temperature(request):
-            heater_on = self.current_temp < self.target_temp - 1.0  # 1°C margin
+            """ Get current, target temperature and heater state """
             return {
                 'temp': round(self.current_temp, 1),
                 'target': round(self.target_temp, 1),
-                'heater_on': heater_on
+                'heater_on': self.heater_on
             }
 
         @self.app.route('/set_target')
         def set_target(request):
+            """ Set the target temperature via query parameter """
             try:
                 value = float(request.args.get('value', self.target_temp))
                 self.target_temp = value
@@ -42,6 +46,10 @@ class WebServer:
             except:
                 return {'status': 'error'}, 400
 
-    def serve_once(self, temp):
-        """Called from main.py to update the current temperature reading"""
+    def serve_temperature_once(self, temp):
+        """Called from main.py to update the current temperature reading for the web interface"""
         self.current_temp = temp
+    
+    def serve_heater_state_once(self, heater_on):
+        """Called from main.py to update the current heater state for the web interface"""
+        self.heater_on = heater_on
