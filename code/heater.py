@@ -14,8 +14,11 @@ class Heater:
         Initialize heater controller
         
         Args:
-            pin: GPIO pin for heater control (if using physical pin)
-            hysteresis: Temperature difference for hysteresis control (°C)
+            pin: GPIO pin for heater control (if using physical pin) - default None (simulated)
+            hysteresis: Temperature difference for hysteresis control (°C) - default 1.0
+            min_temp: Minimum temperature limit (°C) - default 0.0
+            max_temp: Maximum temperature limit (°C) - default 300.0
+            target_temp: Initial target temperature (°C) - default 25.0
         """
         self.pin = pin
         self.hysteresis = hysteresis   
@@ -80,7 +83,7 @@ class Heater:
         
         # Log state changes
         if state != self.last_state:
-            print(f"Heater {'ON' if state else 'OFF'}")
+            print("Heater {}".format('ON' if state else 'OFF'))
             self.last_state = state
       
     def get_state(self):
@@ -101,16 +104,16 @@ class Heater:
             hysteresis (float): Temperature difference in °C
         """
         self.hysteresis = max(0.1, hysteresis)  # Minimum 0.1°C hysteresis
-        print(f"Hysteresis set to {self.hysteresis}°C")
+        print("Hysteresis set to {}°C".format(self.hysteresis))
 
     def set_target_temp(self, value):
         """Set target temperature with validation"""
         if self.min_temp <= value <= self.max_temp:
             self.target_temp = value
-            print(f"Target temperature set to {self.target_temp}°C")
+            print("Target temperature set to {}°C".format(self.target_temp))
             return {'status': 'ok', 'target': self.target_temp}
         else:
-            return {'status': 'error', 'message': f'Target out of range ({self.min_temp}-{self.max_temp}°C)'}, 400
+            return {'status': 'error', 'message': 'Target out of range ({}-{}°C)'.format(self.min_temp, self.max_temp)}, 400
     
     def get_target_temp(self):
         """Get current target temperature"""
