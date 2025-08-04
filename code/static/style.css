@@ -53,6 +53,43 @@ h1 {
   margin-left: 0.4rem;         
 }
 
+.target-display {
+  margin: 1.5rem 0;
+  padding: 1rem;
+  background-color: #f8f9fa;
+  border-radius: 6px;
+  border: 1px solid #e9ecef;
+  text-align: center;
+}
+
+.target-display label {
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 0;
+}
+
+.target-display #currentTarget {
+  color: #0077cc;
+  font-weight: bold;
+}
+
+.input-group {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+
+.input-group input[type="number"] {
+  flex: 1;
+  margin-bottom: 0;
+}
+
+.input-group button {
+  flex-shrink: 0;
+  margin-bottom: 0;
+}
+
 label {
   display: block;
   margin-bottom: 0.5rem;
