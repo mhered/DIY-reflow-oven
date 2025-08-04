@@ -7,15 +7,22 @@ from thermistor import Thermistor
 from heater import Heater
 from wifi import connect
 
-
-# initialize sensor
+# initialize temperature sensor
 SENSOR_PIN = None # 26 to use a physical sensor, None to simulate temp readings
 sensor = Thermistor(pin = SENSOR_PIN)
 
 # initialize heater controller
 HEATER_PIN = 22
-DEFAULT_TARGET_TEMP = 25.0
-heater = Heater(pin=HEATER_PIN, target_temp=DEFAULT_TARGET_TEMP)
+HYSTERESIS = 1.0
+MIN_TARGET_TEMP = 0.0
+MAX_TARGET_TEMP = 300.0
+INITIAL_TARGET_TEMP = 25.0
+
+heater = Heater(pin=HEATER_PIN,
+                hysteresis=HYSTERESIS,
+                min_temp=MIN_TARGET_TEMP,
+                max_temp=MAX_TARGET_TEMP,
+                target_temp=INITIAL_TARGET_TEMP)
 
 # Connect to Wi-Fi
 ip_address = connect()
@@ -54,7 +61,7 @@ while True:
         temperature = sensor.read_temp()
     last_temperature = temperature
 
-     # Use heater class to control heating logic - heater now manages its own target
+    # Use heater class to control heating logic - heater now manages its own target
     heater_on = heater.set_state(temperature)
 
     # Update current temperature and heater state
