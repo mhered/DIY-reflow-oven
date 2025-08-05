@@ -1,0 +1,23 @@
+{
+    "name": "Test",
+    "phases": [
+        {
+            "name": "Warm up",
+            "start_temp": 25,
+            "end_temp": 50,
+            "duration_minutes": 1
+        },
+        {
+            "name": "Hold",
+            "start_temp": 50,
+            "end_temp": 50,
+            "duration_minutes": 0.5
+        },
+        {
+            "name": "Cool down",
+            "start_temp": 50,
+            "end_temp": 25,
+            "duration_minutes": 2
+        }
+    ]
+}

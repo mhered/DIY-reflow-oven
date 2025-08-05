@@ -6,28 +6,14 @@ Handles temperature profiles with multiple phases
 import json
 import time
 
-
 class TemperaturePhase:
     """Represents a single phase in a temperature profile"""
     
-    def __init__(self, name, start_temp, end_temp, 
-                 duration_minutes=None, 
-                 climb_rate_per_minute=None):
+    def __init__(self, name, start_temp, end_temp, duration_minutes):
         self.name = name
         self.start_temp = start_temp
         self.end_temp = end_temp
-        
-        # Either duration OR climb rate must be specified
-        if duration_minutes is not None:
-            self.duration_minutes = duration_minutes
-            self.climb_rate_per_minute = (end_temp - start_temp) / duration_minutes if duration_minutes > 0 else 0
-            self.type = "time_based"
-        elif climb_rate_per_minute is not None:
-            self.climb_rate_per_minute = climb_rate_per_minute
-            self.duration_minutes = abs(end_temp - start_temp) / abs(climb_rate_per_minute) if climb_rate_per_minute != 0 else 0
-            self.type = "rate_based"
-        else:
-            raise ValueError("Either duration_minutes or climb_rate_per_minute must be specified")
+        self.duration_minutes = duration_minutes
     
     def get_target_temp(self, elapsed_minutes):
         """Calculate target temperature for given elapsed time in this phase"""
@@ -46,9 +32,7 @@ class TemperaturePhase:
             'name': self.name,
             'start_temp': self.start_temp,
             'end_temp': self.end_temp,
-            'duration_minutes': self.duration_minutes,
-            'climb_rate_per_minute': self.climb_rate_per_minute,
-            'type': self.type
+            'duration_minutes': self.duration_minutes
         }
     
     @classmethod
@@ -58,8 +42,7 @@ class TemperaturePhase:
             name=data['name'],
             start_temp=data['start_temp'],
             end_temp=data['end_temp'],
-            duration_minutes=data.get('duration_minutes') if 'duration_minutes' in data else None,
-            climb_rate_per_minute=data.get('climb_rate_per_minute') if 'climb_rate_per_minute' in data else None
+            duration_minutes=data['duration_minutes']
         )
 
 
@@ -113,7 +96,6 @@ class TemperatureProfile:
         """Convert profile to dictionary for JSON serialization"""
         return {
             'name': self.name,
-            'total_duration': self.total_duration,
             'phases': [phase.to_dict() for phase in self.phases]
         }
     
@@ -123,9 +105,13 @@ class TemperatureProfile:
         phases = [TemperaturePhase.from_dict(phase_data) for phase_data in data['phases']]
         return cls(name=data['name'], phases=phases)
     
-    def save_to_file(self, filepath):
-        """Save profile to JSON file - MicroPython compatible"""
+    def save_to_file(self, directory):
+        """Save profile to JSON file in specified directory"""
         try:
+            # Create filename from profile name
+            filename = self.name.replace(' ', '_').replace('/', '_') + '.json'
+            filepath = directory + '/' + filename
+            
             with open(filepath, 'w') as f:
                 # Don't use indent parameter as it might not be supported in MicroPython
                 json_str = json.dumps(self.to_dict())
@@ -159,7 +145,7 @@ def create_example_profiles():
         TemperaturePhase("Soak", 150, 180, duration_minutes=2),
         TemperaturePhase("Reflow", 180, 245, duration_minutes=1.5),
         TemperaturePhase("Peak", 245, 245, duration_minutes=0.5),
-        TemperaturePhase("Cooling", 245, 100, climb_rate_per_minute=-60),
+        TemperaturePhase("Cooling", 245, 100, duration_minutes=2.4),  # ~60°C/min cooling
     ]
     
     # Simple test profile

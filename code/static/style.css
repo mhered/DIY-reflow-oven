@@ -4,9 +4,10 @@ body {
   font-family: 'Segoe UI', Roboto, sans-serif;
   background: #f4f4f4;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
-  height: 100vh;
+  min-height: 100vh;
+  padding: 1rem 0;
 }
 
 .container {
@@ -15,8 +16,9 @@ body {
   border-radius: 12px;
   box-shadow: 0 4px 12px rgba(0,0,0,0.1);
   text-align: center;
-  max-width: 400px;
+  max-width: 900px;
   width: 90%;
+  box-sizing: border-box;
 }
 
 h1 {
@@ -74,20 +76,289 @@ h1 {
   font-weight: bold;
 }
 
-.input-group {
+.profile-section {
+  margin: 2rem 0;
+  padding: 1.5rem;
+  background-color: #f8f9fa;
+  border-radius: 8px;
+  border: 1px solid #e9ecef;
+  text-align: left;
+}
+
+.profile-section h2 {
+  margin: 0 0 1rem 0;
+  color: #333;
+  font-size: 1.3rem;
+  text-align: center;
+}
+
+.profile-status {
+  margin-bottom: 1rem;
+  padding: 0.75rem;
+  background-color: white;
+  border-radius: 6px;
+  border: 1px solid #dee2e6;
+}
+
+.profile-status label {
+  font-weight: 600;
+  margin-bottom: 0;
+}
+
+.profile-status #profileStatus {
+  color: #0077cc;
+  font-weight: bold;
+}
+
+.profile-controls {
   display: flex;
   gap: 0.5rem;
-  margin-top: 1rem;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
 }
 
-.input-group input[type="number"] {
+.profile-controls select {
   flex: 1;
-  margin-bottom: 0;
+  min-width: 200px;
+  max-width: 100%;
+  padding: 0.5rem;
+  font-size: 1rem;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  background-color: white;
 }
 
-.input-group button {
+.control-btn {
   flex-shrink: 0;
-  margin-bottom: 0;
+  width: 40px;
+  height: 40px;
+  border: none;
+  border-radius: 6px;
+  font-size: 1.2rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  background-color: #0077cc;
+  color: white;
+}
+
+.control-btn:hover {
+  background-color: #005fa3;
+}
+
+.profile-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+  flex-wrap: wrap;
+}
+
+.control-buttons {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.create-profile-btn {
+  padding: 0.6rem 1.2rem;
+  font-size: 1rem;
+  background-color: #0077cc;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background-color 0.3s;
+  white-space: nowrap;
+}
+
+.create-profile-btn:hover {
+  background-color: #005fa3;
+}
+
+.profile-timer {
+  margin-top: 0.8rem;
+  padding: 0.8rem;
+  background-color: #f8f9fa;
+  border-radius: 6px;
+  border: 1px solid #e9ecef;
+}
+
+.timer-row {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 0.4rem;
+  font-size: 0.9rem;
+}
+
+.timer-row:last-child {
+  margin-bottom: 0.8rem;
+}
+
+.timer-label {
+  font-weight: 500;
+  color: #495057;
+}
+
+.progress-bar {
+  width: 100%;
+  height: 8px;
+  background-color: #e9ecef;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #28a745, #20c997);
+  border-radius: 4px;
+  transition: width 0.3s ease;
+  width: 0%;
+}
+
+.profile-form {
+  margin-top: 1rem;
+  padding: 1.5rem;
+  background-color: white;
+  border-radius: 6px;
+  border: 1px solid #dee2e6;
+}
+
+.profile-form h3 {
+  margin: 0 0 1rem 0;
+  color: #333;
+}
+
+.form-group {
+  margin-bottom: 1rem;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 0.3rem;
+  font-weight: 600;
+}
+
+.form-group input {
+  width: 100%;
+  padding: 0.5rem;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 1rem;
+}
+
+.phases-container h4 {
+  margin: 1.5rem 0 1rem 0;
+  color: #333;
+}
+
+.phase-item {
+  margin-bottom: 1rem;
+  padding: 1rem;
+  background-color: #f8f9fa;
+  border-radius: 6px;
+  border: 1px solid #e9ecef;
+}
+
+.phase-item h5 {
+  margin: 0 0 1rem 0;
+  color: #555;
+}
+
+.phase-fields {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr 1fr auto;
+  gap: 1rem;
+  align-items: end;
+}
+
+@media (max-width: 768px) {
+  .phase-fields {
+    grid-template-columns: 1fr;
+    gap: 0.5rem;
+  }
+  
+  .remove-phase-btn {
+    justify-self: start;
+    margin-top: 0.5rem;
+  }
+  
+  .profile-actions {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.75rem;
+  }
+  
+  .control-buttons {
+    align-self: center;
+  }
+}
+
+.field-group {
+  display: flex;
+  flex-direction: column;
+}
+
+.field-group label {
+  font-size: 0.9rem;
+  margin-bottom: 0.3rem;
+}
+
+.field-group input {
+  padding: 0.4rem;
+  font-size: 0.9rem;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+}
+
+.remove-phase-btn {
+  background-color: #dc3545;
+  color: white;
+  border: none;
+  padding: 0.4rem 0.8rem;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  cursor: pointer;
+  height: fit-content;
+}
+
+.remove-phase-btn:hover {
+  background-color: #c82333;
+}
+
+.form-actions {
+  margin-top: 1.5rem;
+  display: flex;
+  gap: 1rem;
+}
+
+.form-actions button {
+  padding: 0.6rem 1.2rem;
+  font-size: 1rem;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.form-actions button:first-child {
+  background-color: #28a745;
+  color: white;
+}
+
+.form-actions button:first-child:hover {
+  background-color: #218838;
+}
+
+.form-actions button:last-child {
+  background-color: #6c757d;
+  color: white;
+}
+
+.form-actions button:last-child:hover {
+  background-color: #5a6268;
 }
 
 label {

@@ -15,14 +15,41 @@
         .then(data => {
           document.getElementById("currentTemp").innerText = data.temp + " °C";
           
-          // Update current target display (separate from user input)
-          document.getElementById("currentTarget").innerText = data.target + " °C";
-          
-          // Update temperature limits for user input box
-          const targetInput = document.getElementById("targetInput");
-          if (data.limits) {
-            targetInput.min = data.limits.min;
-            targetInput.max = data.limits.max;
+          // Display target temperature or "--" if not set
+          const targetDisplay = data.target !== null ? data.target + " °C" : "--";
+          document.getElementById("currentTarget").innerText = targetDisplay;
+
+          // Update profile status if available
+          if (data.profile_status) {
+            const status = data.profile_status;
+            const statusText = status.active ? 
+              `Running: ${status.profile_name} (${status.current_phase})` : 
+              'Stopped';
+            document.getElementById("profileStatus").innerText = statusText;
+            
+            // Update timer display
+            const timerDiv = document.getElementById("profileTimer");
+            if (status.active) {
+              timerDiv.style.display = "block";
+              
+              // Format time as MM:SS
+              const formatTime = (minutes) => {
+                const mins = Math.floor(minutes);
+                const secs = Math.floor((minutes - mins) * 60);
+                return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+              };
+              
+              document.getElementById("elapsedTime").innerText = formatTime(status.elapsed_minutes);
+              
+              const remaining = Math.max(0, status.total_minutes - status.elapsed_minutes);
+              document.getElementById("remainingTime").innerText = formatTime(remaining);
+              
+              // Update progress bar
+              const progressFill = document.getElementById("progressFill");
+              progressFill.style.width = `${status.progress_percent}%`;
+            } else {
+              timerDiv.style.display = "none";
+            }
           }
 
           const heaterIcon = document.getElementById("heaterStatus");
@@ -39,32 +66,199 @@
         });
     }
 
-    function setTarget() {
-      const targetInput = document.getElementById("targetInput");
-      const val = targetInput.value;
-      
-      // Validate input
-      if (!val || val.trim() === '') {
-        showFeedback('Please enter a target temperature', 'error');
-        return;
-      }
-      
-      fetch('/set_target?value=' + val)
+    function loadProfiles() {
+      fetch('/profiles')
         .then(res => res.json())
         .then(data => {
           if (data.status === 'ok') {
-            console.log('Target set to:', data.target);
-            showFeedback('Target set to ' + data.target + '°C', 'success');
-            targetInput.value = '';
-          } else {
-            console.error('Error setting target:', data.message || 'Unknown error');
-            showFeedback(data.message || 'Error setting target temperature', 'error');
+            const select = document.getElementById("profileSelect");
+            // Clear existing options except the first one
+            select.innerHTML = '<option value="">Select a profile...</option>';
+            
+            // Add profile options
+            data.profiles.forEach(profile => {
+              const option = document.createElement('option');
+              option.value = profile;
+              option.textContent = profile;
+              select.appendChild(option);
+            });
           }
         })
         .catch(error => {
-          console.error('Error setting target:', error);
-          showFeedback('Network error setting target temperature', 'error');
+          console.error('Error loading profiles:', error);
         });
+    }
+
+    function startProfile() {
+      const select = document.getElementById("profileSelect");
+      const profileName = select.value;
+      
+      if (!profileName) {
+        showFeedback('Please select a profile first', 'error');
+        return;
+      }
+      
+      fetch('/profile/start?name=' + encodeURIComponent(profileName))
+        .then(res => res.json())
+        .then(data => {
+          if (data.status === 'ok') {
+            showFeedback(data.message, 'success');
+          } else {
+            showFeedback(data.message || 'Error starting profile', 'error');
+          }
+        })
+        .catch(error => {
+          console.error('Error starting profile:', error);
+          showFeedback('Network error starting profile', 'error');
+        });
+    }
+
+    function stopProfile() {
+      fetch('/profile/stop')
+        .then(res => res.json())
+        .then(data => {
+          if (data.status === 'ok') {
+            showFeedback(data.message, 'success');
+          } else {
+            showFeedback(data.message || 'Error stopping profile', 'error');
+          }
+        })
+        .catch(error => {
+          console.error('Error stopping profile:', error);
+          showFeedback('Network error stopping profile', 'error');
+        });
+    }
+
+    let phaseCounter = 0;
+
+    function toggleProfileForm() {
+      const form = document.getElementById("profileForm");
+      const btn = document.getElementById("toggleFormBtn");
+      
+      if (form.style.display === "none") {
+        form.style.display = "block";
+        btn.textContent = "Hide Form";
+        // Add initial phase
+        if (document.getElementById("phasesList").children.length === 0) {
+          addPhase();
+        }
+      } else {
+        form.style.display = "none";
+        btn.textContent = "Create New Profile";
+      }
+    }
+
+    function addPhase() {
+      phaseCounter++;
+      const phasesList = document.getElementById("phasesList");
+      
+      const phaseDiv = document.createElement("div");
+      phaseDiv.className = "phase-item";
+      phaseDiv.innerHTML = `
+        <h5>Phase ${phaseCounter}</h5>
+        <div class="phase-fields">
+          <div class="field-group">
+            <label>Name:</label>
+            <input type="text" class="phase-name" placeholder="Phase name" value="Phase ${phaseCounter}">
+          </div>
+          <div class="field-group">
+            <label>Start Temp (°C):</label>
+            <input type="number" class="phase-start-temp" placeholder="25" step="0.1">
+          </div>
+          <div class="field-group">
+            <label>End Temp (°C):</label>
+            <input type="number" class="phase-end-temp" placeholder="50" step="0.1">
+          </div>
+          <div class="field-group">
+            <label>Duration (minutes):</label>
+            <input type="number" class="phase-duration" placeholder="5" step="0.1" min="0.1">
+          </div>
+          <button type="button" onclick="removePhase(this)" class="remove-phase-btn">Remove</button>
+        </div>
+      `;
+      
+      phasesList.appendChild(phaseDiv);
+    }
+
+    function removePhase(button) {
+      button.closest('.phase-item').remove();
+    }
+
+    function saveProfile() {
+      const profileName = document.getElementById("profileName").value.trim();
+      
+      if (!profileName) {
+        showFeedback('Please enter a profile name', 'error');
+        return;
+      }
+      
+      // Collect phase data
+      const phaseItems = document.querySelectorAll('.phase-item');
+      const phases = [];
+      
+      for (let i = 0; i < phaseItems.length; i++) {
+        const item = phaseItems[i];
+        const name = item.querySelector('.phase-name').value.trim();
+        const startTemp = parseFloat(item.querySelector('.phase-start-temp').value);
+        const endTemp = parseFloat(item.querySelector('.phase-end-temp').value);
+        const duration = parseFloat(item.querySelector('.phase-duration').value);
+        
+        if (!name || isNaN(startTemp) || isNaN(endTemp) || isNaN(duration) || duration <= 0) {
+          showFeedback(`Please fill all fields for ${name || 'Phase ' + (i + 1)}`, 'error');
+          return;
+        }
+        
+        phases.push({
+          name: name,
+          start_temp: startTemp,
+          end_temp: endTemp,
+          duration_minutes: duration,
+          type: 'time_based'
+        });
+      }
+      
+      if (phases.length === 0) {
+        showFeedback('Please add at least one phase', 'error');
+        return;
+      }
+      
+      // Send to server using individual parameters for MicroPython URL limits
+      let url = '/profile/create?name=' + encodeURIComponent(profileName);
+      
+      // Add each phase as separate parameters
+      for (let i = 0; i < phases.length; i++) {
+        const phase = phases[i];
+        url += '&phase_' + i + '_name=' + encodeURIComponent(phase.name);
+        url += '&phase_' + i + '_start=' + phase.start_temp;
+        url += '&phase_' + i + '_end=' + phase.end_temp;
+        url += '&phase_' + i + '_duration=' + phase.duration_minutes;
+      }
+      
+      fetch(url)
+      .then(res => res.json())
+      .then(data => {
+        if (data.status === 'ok') {
+          showFeedback('Profile created successfully!', 'success');
+          cancelProfileForm();
+          loadProfiles(); // Reload the profile list
+        } else {
+          showFeedback(data.message || 'Error creating profile', 'error');
+        }
+      })
+      .catch(error => {
+        console.error('Error creating profile:', error);
+        showFeedback('Network error creating profile', 'error');
+      });
+    }
+
+    function cancelProfileForm() {
+      document.getElementById("profileForm").style.display = "none";
+      document.getElementById("toggleFormBtn").textContent = "Create New Profile";
+      
+      // Clear form
+      document.getElementById("profileName").value = "";
+      document.getElementById("phasesList").innerHTML = "";
+      phaseCounter = 0;
     }
 
     function showFeedback(message, type) {
@@ -107,6 +301,7 @@
 
     window.onload = () => {
       updateTemp();
+      loadProfiles();
       interval = setInterval(updateTemp, 2000);
     };
   </script>
@@ -127,9 +322,63 @@
       <label>Current Target: <span id="currentTarget">--</span></label>
     </div>
 
-    <div class="input-group">
-      <input type="number" id="targetInput" placeholder="Enter temperature (°C)">
-      <button onclick="setTarget()">Set Target</button>
+    <div class="profile-section">
+      <h2>Temperature Profile Status:</h2>
+      
+      <div class="profile-status">
+        <label><span id="profileStatus">--</span></label>
+        <div id="profileTimer" class="profile-timer" style="display: none;">
+          <div class="timer-row">
+            <span class="timer-label">Elapsed:</span>
+            <span id="elapsedTime">--</span>
+          </div>
+          <div class="timer-row">
+            <span class="timer-label">Remaining:</span>
+            <span id="remainingTime">--</span>
+          </div>
+          <div class="progress-bar">
+            <div id="progressFill" class="progress-fill"></div>
+          </div>
+        </div>
+      </div>
+      
+      <div class="profile-controls">
+        <select id="profileSelect">
+          <option value="">Select a profile...</option>
+        </select>
+      </div>
+      
+      <div class="profile-actions">
+        <div class="control-buttons">
+          <button onclick="startProfile()" id="playBtn" class="control-btn play-btn">▶</button>
+          <button onclick="stopProfile()" id="stopBtn" class="control-btn stop-btn">⏸</button>
+        </div>
+        <button onclick="toggleProfileForm()" id="toggleFormBtn" class="create-profile-btn">Create New Profile</button>
+      </div>
+      
+      <div class="profile-creator">
+        <div id="profileForm" class="profile-form" style="display: none;">
+          <h3>Create New Profile</h3>
+          
+          <div class="form-group">
+            <label for="profileName">Profile Name:</label>
+            <input type="text" id="profileName" placeholder="Enter profile name">
+          </div>
+          
+          <div class="phases-container">
+            <h4>Phases:</h4>
+            <div id="phasesList">
+              <!-- Phases will be added here dynamically -->
+            </div>
+            <button type="button" onclick="addPhase()">Add Phase</button>
+          </div>
+          
+          <div class="form-actions">
+            <button onclick="saveProfile()">Save Profile</button>
+            <button onclick="cancelProfileForm()">Cancel</button>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 </body>

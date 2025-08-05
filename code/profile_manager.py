@@ -72,10 +72,7 @@ class ProfileManager:
     def save_profile(self, profile):
         """Save a profile to file"""
         try:
-            filename = "{}.json".format(profile.name.replace(' ', '_').lower())
-            # Construct filepath manually for MicroPython compatibility
-            filepath = self.profiles_directory + '/' + filename
-            profile.save_to_file(filepath)
+            profile.save_to_file(self.profiles_directory)
             self.profiles[profile.name] = profile
             return True
         except Exception as e:
@@ -108,6 +105,7 @@ class ProfileManager:
         """Start executing a profile"""
         profile = self.profiles.get(profile_name)
         if not profile:
+            print("Error: Profile '{}' not found".format(profile_name))
             return False
         
         self.current_profile = profile
@@ -115,7 +113,9 @@ class ProfileManager:
         self.start_time = time.time()
         self.elapsed_minutes = 0.0
         
-        print("Started profile: {}".format(profile_name))
+        print("Started profile: '{}' at time {}".format(profile_name, self.start_time))
+        print("Profile has {} phases, total duration: {} minutes".format(
+            len(profile.phases), profile.total_duration))
         return True
     
     def stop_profile(self):
@@ -140,16 +140,26 @@ class ProfileManager:
         
         # Check if profile is complete
         if self.current_profile.is_complete(self.elapsed_minutes):
-            print("Profile '{}' completed".format(self.current_profile.name))
+            print("Profile '{}' completed after {:.2f} minutes".format(
+                self.current_profile.name, self.elapsed_minutes))
             self.stop_profile()
             return None
         
         # Get current target temperature
         phase_index, phase_name, target_temp = self.current_profile.get_current_phase_and_target(self.elapsed_minutes)
+        # Only print status every 30 seconds to avoid spam
+        if int(self.elapsed_minutes * 2) % 60 == 0:  # Every 30 seconds
+            print("Profile '{}': {:.1f}min, {}, {:.1f}°C".format(
+                self.current_profile.name, self.elapsed_minutes, phase_name, target_temp))
         return target_temp
     
     def get_status(self):
         """Get current profile execution status"""
+        # Update elapsed time first
+        if self.is_active and self.current_profile and self.start_time:
+            current_time = time.time()
+            self.elapsed_minutes = (current_time - self.start_time) / 60.0
+        
         if not self.is_active or not self.current_profile:
             return {
                 'active': False,
@@ -175,3 +185,34 @@ class ProfileManager:
             'total_minutes': self.current_profile.total_duration,
             'progress_percent': progress_percent
         }
+    
+    def create_profile(self, name, phases_data):
+        """Create a new temperature profile from phase data"""
+        try:
+            from profile import TemperaturePhase, TemperatureProfile
+            
+            # Create phases from data
+            phases = []
+            for phase_data in phases_data:
+                phase = TemperaturePhase(
+                    name=phase_data['name'],
+                    start_temp=float(phase_data['start_temp']),
+                    end_temp=float(phase_data['end_temp']),
+                    duration_minutes=float(phase_data['duration_minutes'])
+                )
+                phases.append(phase)
+            
+            # Create profile
+            profile = TemperatureProfile(name, phases)
+            
+            # Save to file
+            profile.save_to_file(self.profiles_directory)
+            
+            # Reload profiles to include the new one
+            self.load_all_profiles()
+            
+            return True
+            
+        except Exception as e:
+            print("Error creating profile:", e)
+            return False

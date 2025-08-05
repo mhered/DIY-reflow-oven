@@ -12,11 +12,11 @@ SENSOR_PIN = None # 26 to use a physical sensor, None to simulate temp readings
 sensor = Thermistor(pin = SENSOR_PIN)
 
 # initialize heater controller
-HEATER_PIN = 22
+HEATER_PIN = 22 # 22 to use a physical heater, None to simulate
 HYSTERESIS = 1.0
 MIN_TARGET_TEMP = 0.0
 MAX_TARGET_TEMP = 300.0
-INITIAL_TARGET_TEMP = 25.0
+INITIAL_TARGET_TEMP = None  # Start with no target (heater off)
 
 heater = Heater(pin=HEATER_PIN,
                 hysteresis=HYSTERESIS,
@@ -39,11 +39,12 @@ server = WebServer(heater)
 time.sleep(5)
 
 # Temperature Simulation parameters
-INITIAL_TEMP = 25 	# C
+AMBIENT_TEMP = 25 	# C
 NOISE = 0.1 		# C
 HEATING = 0.4 		# C/sec
-COOLING = -0.3 		# C/sec
-last_temperature = INITIAL_TEMP
+COOLING_K = 0.08 		# Newton's cooling constant
+
+temperature = AMBIENT_TEMP  # Start at ambient temperature
 
 # Time to wait between temperature updates
 WAIT = 1 			# sec
@@ -52,14 +53,13 @@ WAIT = 1 			# sec
 while True:
     if sensor.pin is None:
         # If no sensor, simulate temperature with random noise and heating / cooling
-        temperature = last_temperature + NOISE * (random.random() - 0.5) * 2
+        temperature += NOISE * (random.random() - 0.5) * 2
         if heater.is_on:
             temperature += HEATING
         else:
-            temperature += COOLING 
+            temperature -= COOLING_K * (temperature - AMBIENT_TEMP)
     else:
         temperature = sensor.read_temp()
-    last_temperature = temperature
 
     # Use heater class to control heating logic - heater now manages its own target
     # Check if profile manager has an active profile and update target accordingly
@@ -67,6 +67,9 @@ while True:
     if profile_target is not None:
         # Profile is active, use profile target
         heater.set_target_temp(profile_target)
+    else:
+        # No profile active, heater stays off
+        heater.set_target_temp(None)
 
     heater_on = heater.set_state(temperature)
 

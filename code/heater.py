@@ -9,7 +9,7 @@ class Heater:
                  hysteresis=1.0,
                  min_temp=0.0, 
                  max_temp=300.0,
-                 target_temp=25.0):
+                 target_temp=None):
         """
         Initialize heater controller
         
@@ -18,7 +18,7 @@ class Heater:
             hysteresis: Temperature difference for hysteresis control (°C) - default 1.0
             min_temp: Minimum temperature limit (°C) - default 0.0
             max_temp: Maximum temperature limit (°C) - default 300.0
-            target_temp: Initial target temperature (°C) - default 25.0
+            target_temp: Initial target temperature (°C) - default None (heater off)
         """
         self.pin = pin
         self.hysteresis = hysteresis   
@@ -50,6 +50,7 @@ class Heater:
             current_temp (float): Current temperature reading
             target_temp (float): Optional override for target temperature.
                                 If None, uses the heater's stored target_temp
+                                If target_temp is None, heater stays off
             
         Returns:
             bool: True if heater should be on, False otherwise
@@ -57,6 +58,12 @@ class Heater:
         # Use provided target or fall back to stored target
         if target_temp is None:
             target_temp = self.target_temp
+        
+        # If no target is set, keep heater off
+        if target_temp is None:
+            self.is_on = False
+            self._set_physical_state(self.is_on)
+            return self.is_on
         
         # Simple hysteresis control
         if not self.is_on:
@@ -108,7 +115,11 @@ class Heater:
 
     def set_target_temp(self, value):
         """Set target temperature with validation"""
-        if self.min_temp <= value <= self.max_temp:
+        if value is None:
+            self.target_temp = None
+            print("Target temperature disabled (heater off)")
+            return {'status': 'ok', 'target': None}
+        elif self.min_temp <= value <= self.max_temp:
             self.target_temp = value
             print("Target temperature set to {}°C".format(self.target_temp))
             return {'status': 'ok', 'target': self.target_temp}
