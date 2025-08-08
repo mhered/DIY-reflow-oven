@@ -6,6 +6,11 @@ from server import WebServer
 from thermistor import Thermistor
 from heater import Heater
 from wifi import connect
+from profile import set_profile_debug
+
+# Debug configuration - set to True to enable verbose profile logging
+DEBUG_MODE = False  # Change to True for debug output
+set_profile_debug(DEBUG_MODE)
 
 # initialize temperature sensor
 SENSOR_PIN = None # 26 to use a physical sensor, None to simulate temp readings

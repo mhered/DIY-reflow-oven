@@ -5,7 +5,7 @@ Manages profile execution and integration with heater control
 
 import os
 import time
-from profile import TemperatureProfile, create_example_profiles
+from profile import TemperatureProfile, TemperaturePhase, create_example_profiles, debug_print
 
 
 class ProfileManager:
@@ -38,28 +38,43 @@ class ProfileManager:
         example_profiles = create_example_profiles()
         for profile in example_profiles:
             self.save_profile(profile)
-        self.load_all_profiles()  # Reload to include saved profiles
+        print("Created {} default profiles".format(len(example_profiles)))
     
     def load_all_profiles(self):
         """Load all profiles from the profiles directory"""
-        self.profiles.clear()
+        debug_print("Loading profiles from: {}".format(self.profiles_directory))
+        
+        old_count = len(self.profiles)
+        debug_print("Currently have {} profiles loaded".format(old_count))
         
         try:
             # Check if directory exists and list files
             files = os.listdir(self.profiles_directory)
-        except OSError:
-            # Directory doesn't exist or can't be read
-            return
-        
-        for filename in files:
-            if filename.endswith('.json'):
+            debug_print("Directory listing successful: {} files".format(len(files)))
+            
+            json_files = [f for f in files if f.endswith('.json')]
+            debug_print("JSON files found: {}".format(len(json_files)))
+            
+            # Now clear and reload
+            self.profiles.clear()
+            debug_print("Cleared profiles dictionary")
+            
+            loaded_count = 0
+            for filename in json_files:
                 try:
-                    # Construct filepath manually for MicroPython compatibility
                     filepath = self.profiles_directory + '/' + filename
                     profile = TemperatureProfile.load_from_file(filepath)
                     self.profiles[profile.name] = profile
+                    loaded_count += 1
                 except Exception as e:
-                    print("Error loading profile {}: {}".format(filename, e))
+                    print("Error loading {}: {}".format(filename, e))
+            
+            print("Successfully loaded {} profiles".format(loaded_count))
+            
+        except Exception as e:
+            print("CRITICAL ERROR in load_all_profiles: {}".format(e))
+            # If there's an error, don't clear the existing profiles
+            return
     
     def get_profile_names(self):
         """Get list of available profile names"""
@@ -69,11 +84,46 @@ class ProfileManager:
         """Get profile by name"""
         return self.profiles.get(name)
     
+    def debug_file_system(self):
+        """Debug helper to check file system state"""
+        debug_print("=== Profile Manager Debug Info ===")
+        debug_print("Profiles directory: {}".format(self.profiles_directory))
+        debug_print("Loaded profiles: {}".format(list(self.profiles.keys())))
+        
+        try:
+            # Force sync before listing
+            if hasattr(os, 'sync'):
+                os.sync()
+            files = os.listdir(self.profiles_directory)
+            debug_print("Files in directory: {}".format(files))
+            json_files = [f for f in files if f.endswith('.json')]
+            debug_print("JSON files: {}".format(json_files))
+        except Exception as e:
+            debug_print("Error listing directory: {}".format(e))
+            files = []
+        debug_print("=== End Debug Info ===")
+        
+        return {
+            'loaded_profiles': list(self.profiles.keys()),
+            'directory_files': files
+        }
+    
     def save_profile(self, profile):
         """Save a profile to file"""
         try:
             profile.save_to_file(self.profiles_directory)
+            
+            # Force file system sync on MicroPython
+            try:
+                if hasattr(os, 'sync'):
+                    os.sync()
+            except Exception:
+                pass  # Ignore if sync is not available
+            
+            # Add to in-memory profiles dictionary directly
             self.profiles[profile.name] = profile
+            print("Saved profile: {}".format(profile.name))
+            
             return True
         except Exception as e:
             print("Error saving profile: {}".format(e))
@@ -88,10 +138,21 @@ class ProfileManager:
                 filepath = self.profiles_directory + '/' + filename
                 try:
                     os.remove(filepath)
+                    
+                    # Force file system sync on MicroPython
+                    try:
+                        if hasattr(os, 'sync'):
+                            os.sync()
+                    except Exception:
+                        pass  # Ignore if sync is not available
+                        
                 except OSError:
                     # File doesn't exist or can't be deleted
                     pass
+                
+                # Remove from in-memory profiles dictionary directly
                 del self.profiles[name]
+                print("Deleted profile: {}".format(name))
                 
                 # If this was the current profile, stop execution
                 if self.current_profile and self.current_profile.name == name:
@@ -189,7 +250,8 @@ class ProfileManager:
     def create_profile(self, name, phases_data):
         """Create a new temperature profile from phase data"""
         try:
-            from profile import TemperaturePhase, TemperatureProfile
+            debug_print("Creating profile: {}".format(name))
+            debug_print("Phases data: {}".format(phases_data))
             
             # Create phases from data
             phases = []
@@ -204,15 +266,17 @@ class ProfileManager:
             
             # Create profile
             profile = TemperatureProfile(name, phases)
+            debug_print("Profile created with {} phases".format(len(phases)))
             
-            # Save to file
-            profile.save_to_file(self.profiles_directory)
-            
-            # Reload profiles to include the new one
-            self.load_all_profiles()
-            
-            return True
+            # Use the existing save_profile method instead of duplicating logic
+            success = self.save_profile(profile)
+            if success:
+                print("Profile '{}' saved successfully".format(name))
+            else:
+                print("Failed to save profile '{}'".format(name))
+                
+            return success
             
         except Exception as e:
-            print("Error creating profile:", e)
+            print("Error creating profile '{}': {}".format(name, e))
             return False

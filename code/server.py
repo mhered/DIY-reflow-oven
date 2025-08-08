@@ -79,45 +79,48 @@ class WebServer:
             profile_name = request.args.get('name')
             if not profile_name:
                 return {'status': 'error', 'message': 'Profile name required'}, 400
-                
-                # Collect phase data from multiple parameters
-                phases_data = []
-                phase_index = 0
-                
-                while True:
-                    phase_name = request.args.get('phase_{}_name'.format(phase_index))
-                    if not phase_name:  # No more phases
-                        break
-                    
-                    try:
-                        start_temp = float(request.args.get('phase_{}_start'.format(phase_index), 0))
-                        end_temp = float(request.args.get('phase_{}_end'.format(phase_index), 0))
-                        duration = float(request.args.get('phase_{}_duration'.format(phase_index), 0))
-                        
-                        phases_data.append({
-                            'name': phase_name,
-                            'start_temp': start_temp,
-                            'end_temp': end_temp,
-                            'duration_minutes': duration
-                        })
-                        
-                        phase_index += 1
-                        
-                    except (ValueError, TypeError):
-                        return {'status': 'error', 'message': 'Invalid phase data for phase {}'.format(phase_index)}, 400
-                
-                if not phases_data:
-                    return {'status': 'error', 'message': 'At least one phase required'}, 400
+            
+            # Collect phase data from multiple parameters
+            phases_data = []
+            phase_index = 0
+            
+            while True:
+                phase_name = request.args.get('phase_{}_name'.format(phase_index))
+                if not phase_name:  # No more phases
+                    break
                 
                 try:
-                    # Create profile
-                    if self.profile_manager.create_profile(profile_name, phases_data):
-                        return {'status': 'ok', 'message': 'Profile created successfully'}
-                    else:
-                        return {'status': 'error', 'message': 'Failed to create profile'}, 500
-                        
-                except Exception as e:
-                    return {'status': 'error', 'message': 'Error creating profile: {}'.format(str(e))}, 400
+                    start_temp = float(request.args.get('phase_{}_start'.format(phase_index), 0))
+                    end_temp = float(request.args.get('phase_{}_end'.format(phase_index), 0))
+                    duration = float(request.args.get('phase_{}_duration'.format(phase_index), 0))
+                    
+                    phases_data.append({
+                        'name': phase_name,
+                        'start_temp': start_temp,
+                        'end_temp': end_temp,
+                        'duration_minutes': duration
+                    })
+                    
+                    phase_index += 1
+                    
+                except (ValueError, TypeError):
+                    return {'status': 'error', 'message': 'Invalid phase data for phase {}'.format(phase_index)}, 400
+            
+            if not phases_data:
+                return {'status': 'error', 'message': 'At least one phase required'}, 400
+            
+            try:
+                # Create profile
+                if self.profile_manager.create_profile(profile_name, phases_data):
+                    # Give file system time to sync (especially important on MicroPython)
+                    import time
+                    time.sleep(0.1)
+                    return {'status': 'ok', 'message': 'Profile created successfully'}
+                else:
+                    return {'status': 'error', 'message': 'Failed to create profile'}, 500
+                    
+            except Exception as e:
+                return {'status': 'error', 'message': 'Error creating profile: {}'.format(str(e))}, 400
 
     def serve_temperature_once(self, temp):
         """Called from main.py to update the current temperature reading for the web interface"""

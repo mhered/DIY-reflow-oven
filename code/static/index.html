@@ -67,7 +67,7 @@
     }
 
     function loadProfiles() {
-      fetch('/profiles')
+      return fetch('/profiles')
         .then(res => res.json())
         .then(data => {
           if (data.status === 'ok') {
@@ -75,17 +75,20 @@
             // Clear existing options except the first one
             select.innerHTML = '<option value="">Select a profile...</option>';
             
-            // Add profile options
+            // Add each profile as an option
             data.profiles.forEach(profile => {
-              const option = document.createElement('option');
+              const option = document.createElement("option");
               option.value = profile;
               option.textContent = profile;
               select.appendChild(option);
             });
+          } else {
+            console.error('Profiles response error:', data);
           }
         })
         .catch(error => {
           console.error('Error loading profiles:', error);
+          throw error; // Re-throw so retry logic can catch it
         });
     }
 
@@ -240,7 +243,26 @@
         if (data.status === 'ok') {
           showFeedback('Profile created successfully!', 'success');
           cancelProfileForm();
-          loadProfiles(); // Reload the profile list
+          
+          // Simple approach: wait a bit and reload profiles
+          setTimeout(() => {
+            loadProfiles().then(() => {
+              const select = document.getElementById("profileSelect");
+              
+              // Check if our new profile appears in the dropdown
+              const profileExists = Array.from(select.options).some(option => 
+                option.value === profileName
+              );
+              
+              if (!profileExists) {
+                console.warn('New profile not immediately visible in dropdown');
+              }
+            }).catch(error => {
+              console.error('Error reloading profiles:', error);
+              showFeedback('Error refreshing profile list', 'error');
+            });
+          }, 300);
+          
         } else {
           showFeedback(data.message || 'Error creating profile', 'error');
         }

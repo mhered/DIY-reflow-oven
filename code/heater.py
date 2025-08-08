@@ -116,8 +116,9 @@ class Heater:
     def set_target_temp(self, value):
         """Set target temperature with validation"""
         if value is None:
-            self.target_temp = None
-            print("Target temperature disabled (heater off)")
+            if not self.target_temp is None: # reduce redundant debug messages
+                self.target_temp = None
+                print("Target temperature disabled (heater off)")
             return {'status': 'ok', 'target': None}
         elif self.min_temp <= value <= self.max_temp:
             self.target_temp = value
