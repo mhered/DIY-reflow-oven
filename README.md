@@ -61,7 +61,7 @@ $ thonny
 | `SCK`    | GP1             | Pin 2           | I²C0 SCL |
 | `SDA`    | GP0             | Pin 1           | I²C0 SDA |
 
-### Result
+### Wiring
 
 ![](./assets/thermistor_bb.png)
 
@@ -93,14 +93,42 @@ PASSWORD = "Password"
 
 ![](./assets/server_v1.png)
 
+## Step 3 - Control the heater
+
 Next we refactor using [Microdot](https://github.com/miguelgrinberg/microdot) framework and add a few improvements:
 
-* replace repeated full-page reload every 2 seconds using meta-refresh with polling a tiny JSON file using Java Script. This is more efficient, avoids page flicker and is more extensible 
-* save web page as static files (`index.html` and `style.css`) with a minimalistic, modern design
+* Replace repeated full-page reload every 2 seconds using meta-refresh with polling a tiny JSON file using Java Script. This is more efficient, avoids page flicker and is more extensible 
+* Save web page as static files (`index.html` and `style.css`) with a minimalistic, modern design
 * Add `/set_target?value=XX` route to update target temperature via HTTP
 * Add REST endpoint `/temperature` exposing current and target temp + heater state
 
+* `heater.py` - contains the target temperature logic and functions to control a heater in GPIO22
+
+We copy the library to the pico: `microdot.py`.
+
 ![](./assets/server_v2.png)
+
+### Wiring
+| ![](./assets/thermistor_v2_bb.png) | ![](./assets/breadboard.jpg) |
+| ---------------------------------- | ---------------------------- |
+
+![](./assets/thermistor_v2_schem.png)
+
+## Step 4 - Temperature Profiles
+
+Next we refactor to add support for temperature profiles and disable manual target temperature setting.
+
+- `profile.py` - classes for multi-phase temperature control with JSON serialization
+- `profile_manager.py` functions to manage profile execution, file persistence, and state tracking
+- new `profiles/` folder to store temperature profiles as JSON files
+
+![](./assets/server_v3.png)
+
+## Step 5 - Plot temperature graphs
+
+
+
+
 
 ## Sources
 
