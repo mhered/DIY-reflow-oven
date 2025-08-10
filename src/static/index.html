@@ -6,6 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Temperature Dashboard</title>
   <link rel="stylesheet" href="/style.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script>
     let interval = null;
 
@@ -106,6 +107,9 @@
         .then(data => {
           if (data.status === 'ok') {
             showFeedback(data.message, 'success');
+            // Show graph and load profile data
+            loadProfileForGraph(profileName);
+            showTemperatureGraph();
           } else {
             showFeedback(data.message || 'Error starting profile', 'error');
           }
@@ -122,6 +126,8 @@
         .then(data => {
           if (data.status === 'ok') {
             showFeedback(data.message, 'success');
+            // Hide graph when profile stops
+            hideTemperatureGraph();
           } else {
             showFeedback(data.message || 'Error stopping profile', 'error');
           }
@@ -321,10 +327,203 @@
       feedback.style.display = 'block';
     }
 
+    // Temperature graphing functionality
+    let temperatureChart = null;
+    let profileData = null;
+    let graphUpdateCounter = 0;
+
+    function createTemperatureChart() {
+      const ctx = document.getElementById('temperatureChart').getContext('2d');
+      
+      temperatureChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+          datasets: [{
+            label: 'Target',
+            data: [],
+            borderColor: 'rgb(255, 99, 132)',
+            backgroundColor: 'rgba(255, 99, 132, 0.1)',
+            borderWidth: 1.5,
+            fill: false,
+            pointRadius: 0,
+            tension: 0.1
+          }, {
+            label: 'Measured',
+            data: [],
+            borderColor: 'rgb(54, 162, 235)',
+            backgroundColor: 'rgba(54, 162, 235, 0.1)',
+            borderWidth: 1.5,
+            fill: false,
+            pointRadius: 1,
+            tension: 0.1
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          layout: {
+            padding: {
+              top: 5,
+              right: 5,
+              bottom: 5,
+              left: 5
+            }
+          },
+          scales: {
+            x: {
+              type: 'linear',
+              position: 'bottom',
+              title: {
+                display: true,
+                text: 'Time (min)',
+                font: {
+                  size: 10
+                }
+              },
+              ticks: {
+                font: {
+                  size: 9
+                }
+              },
+              grid: {
+                display: true,
+                lineWidth: 0.5
+              }
+            },
+            y: {
+              title: {
+                display: true,
+                text: '°C',
+                font: {
+                  size: 10
+                }
+              },
+              ticks: {
+                font: {
+                  size: 9
+                }
+              },
+              grid: {
+                display: true,
+                lineWidth: 0.5
+              }
+            }
+          },
+          plugins: {
+            legend: {
+              display: true,
+              position: 'top',
+              labels: {
+                font: {
+                  size: 10
+                },
+                padding: 8,
+                usePointStyle: true,
+                pointStyle: 'line'
+              }
+            }
+          }
+        }
+      });
+    }
+
+    function loadProfileForGraph(profileName) {
+      fetch('/profile/data?name=' + encodeURIComponent(profileName))
+        .then(res => {
+          if (!res.ok) {
+            throw new Error('Network response was not ok');
+          }
+          return res.json();
+        })
+        .then(data => {
+          if (data.status === 'ok') {
+            profileData = data.data;
+            updateProfileGraph();
+          } else {
+            console.error('Profile data error:', data.message);
+          }
+        })
+        .catch(error => {
+          console.warn('Profile data loading failed:', error.message);
+          // Hide graph if we can't load profile data
+          hideTemperatureGraph();
+        });
+    }
+
+    function updateProfileGraph() {
+      if (!temperatureChart || !profileData) return;
+
+      // Update target temperature line
+      const targetData = profileData.points.map(point => ({
+        x: point.time,
+        y: point.temperature
+      }));
+      
+      temperatureChart.data.datasets[0].data = targetData;
+      temperatureChart.update('none');
+    }
+
+    function updateMeasuredTemperature() {
+      if (!temperatureChart) return;
+
+      fetch('/temperature/data')
+        .then(res => {
+          if (!res.ok) {
+            throw new Error('Network response was not ok');
+          }
+          return res.json();
+        })
+        .then(data => {
+          if (data.status === 'ok' && data.profile_active) {
+            const measuredData = data.data.map(point => ({
+              x: point.time,
+              y: point.temperature
+            }));
+            
+            temperatureChart.data.datasets[1].data = measuredData;
+            temperatureChart.update('none');
+          } else if (!data.profile_active) {
+            // Clear measured data and hide graph when profile is not active
+            temperatureChart.data.datasets[1].data = [];
+            temperatureChart.update('none');
+            hideTemperatureGraph();
+          }
+        })
+        .catch(error => {
+          console.warn('Temperature data update failed (will retry):', error.message);
+          // Don't show user error for this - just log and continue
+        });
+    }
+
+    function showTemperatureGraph() {
+      document.getElementById('temperatureGraphContainer').style.display = 'block';
+    }
+
+    function hideTemperatureGraph() {
+      document.getElementById('temperatureGraphContainer').style.display = 'none';
+      if (temperatureChart) {
+        temperatureChart.data.datasets[0].data = [];
+        temperatureChart.data.datasets[1].data = [];
+        temperatureChart.update('none');
+      }
+      profileData = null;
+    }
+
     window.onload = () => {
       updateTemp();
       loadProfiles();
-      interval = setInterval(updateTemp, 2000);
+      createTemperatureChart();
+      interval = setInterval(() => {
+        updateTemp();
+        
+        // Update graph much less frequently to reduce memory pressure
+        // Every 6th update = every 12 seconds
+        graphUpdateCounter++;
+        if (graphUpdateCounter >= 6) {
+          updateMeasuredTemperature();
+          graphUpdateCounter = 0;
+        }
+      }, 2000);
     };
   </script>
 </head>
@@ -360,6 +559,13 @@
           </div>
           <div class="progress-bar">
             <div id="progressFill" class="progress-fill"></div>
+          </div>
+          
+          <!-- Temperature Graph integrated in the same section -->
+          <div id="temperatureGraphContainer" class="temperature-graph-compact" style="display: none;">
+            <div class="chart-container-compact">
+              <canvas id="temperatureChart"></canvas>
+            </div>
           </div>
         </div>
       </div>

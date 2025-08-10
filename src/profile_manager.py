@@ -280,3 +280,48 @@ class ProfileManager:
         except Exception as e:
             print("Error creating profile '{}': {}".format(name, e))
             return False
+
+    def get_profile_graph_data(self, profile_name):
+        """Get profile data formatted for graphing"""
+        if profile_name not in self.profiles:
+            return None
+            
+        profile = self.profiles[profile_name]
+        
+        # Generate temperature points - very reduced frequency to save memory on MicroPython
+        points = []
+        total_minutes = 0.0
+        
+        for phase in profile.phases:
+            phase_start_time = total_minutes
+            # Very conservative sampling for MicroPython memory constraints
+            # Maximum 3-4 points per phase to keep total points low
+            if phase.duration_minutes <= 2:
+                num_samples = 2  # Start and end only for very short phases
+            elif phase.duration_minutes <= 10:
+                num_samples = 3  # Start, middle, end
+            else:
+                num_samples = 4  # Start, 1/3, 2/3, end
+            
+            for i in range(num_samples):
+                if num_samples == 1:
+                    time_in_phase = phase.duration_minutes
+                else:
+                    time_in_phase = (i / (num_samples - 1)) * phase.duration_minutes
+                    
+                absolute_time = phase_start_time + time_in_phase
+                temp = phase.get_target_temp(time_in_phase)
+                
+                points.append({
+                    'time': round(absolute_time, 2),
+                    'temperature': round(temp, 1),
+                    'phase': phase.name
+                })
+                    
+            total_minutes += phase.duration_minutes
+        
+        return {
+            'name': profile.name,
+            'total_duration': round(total_minutes, 2),
+            'points': points
+        }

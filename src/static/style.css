@@ -12,18 +12,18 @@ body {
 
 .container {
   background: #fff;
-  padding: 2rem 2.5rem;
-  border-radius: 12px;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  padding: 1.5rem 2rem;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
   text-align: center;
-  max-width: 900px;
+  max-width: 800px;
   width: 90%;
   box-sizing: border-box;
 }
 
 h1 {
-  font-size: 1.5rem;
-  margin-bottom: 1rem;
+  font-size: 1.4rem;
+  margin-bottom: 0.8rem;
   color: #333;
 }
 
@@ -77,26 +77,26 @@ h1 {
 }
 
 .profile-section {
-  margin: 2rem 0;
-  padding: 1.5rem;
+  margin: 1.5rem 0;
+  padding: 1rem;
   background-color: #f8f9fa;
-  border-radius: 8px;
+  border-radius: 6px;
   border: 1px solid #e9ecef;
   text-align: left;
 }
 
 .profile-section h2 {
-  margin: 0 0 1rem 0;
+  margin: 0 0 0.8rem 0;
   color: #333;
-  font-size: 1.3rem;
+  font-size: 1.2rem;
   text-align: center;
 }
 
 .profile-status {
-  margin-bottom: 1rem;
-  padding: 0.75rem;
+  margin-bottom: 0.8rem;
+  padding: 0.6rem;
   background-color: white;
-  border-radius: 6px;
+  border-radius: 4px;
   border: 1px solid #dee2e6;
 }
 
@@ -115,7 +115,7 @@ h1 {
   gap: 0.5rem;
   align-items: center;
   flex-wrap: wrap;
-  margin-bottom: 1rem;
+  margin-bottom: 0.8rem;
 }
 
 .profile-controls select {
@@ -154,7 +154,7 @@ h1 {
   justify-content: space-between;
   align-items: center;
   gap: 1rem;
-  margin-bottom: 1.5rem;
+  margin-bottom: 1rem;
   flex-wrap: wrap;
 }
 
@@ -180,22 +180,22 @@ h1 {
 }
 
 .profile-timer {
-  margin-top: 0.8rem;
-  padding: 0.8rem;
+  margin-top: 0.6rem;
+  padding: 0.6rem;
   background-color: #f8f9fa;
-  border-radius: 6px;
+  border-radius: 4px;
   border: 1px solid #e9ecef;
 }
 
 .timer-row {
   display: flex;
   justify-content: space-between;
-  margin-bottom: 0.4rem;
-  font-size: 0.9rem;
+  margin-bottom: 0.3rem;
+  font-size: 0.85rem;
 }
 
 .timer-row:last-child {
-  margin-bottom: 0.8rem;
+  margin-bottom: 0.6rem;
 }
 
 .timer-label {
@@ -205,16 +205,17 @@ h1 {
 
 .progress-bar {
   width: 100%;
-  height: 8px;
+  height: 6px;
   background-color: #e9ecef;
-  border-radius: 4px;
+  border-radius: 3px;
   overflow: hidden;
+  margin-bottom: 0.5rem;
 }
 
 .progress-fill {
   height: 100%;
   background: linear-gradient(90deg, #28a745, #20c997);
-  border-radius: 4px;
+  border-radius: 3px;
   transition: width 0.3s ease;
   width: 0%;
 }
@@ -391,4 +392,28 @@ button {
 
 button:hover {
   background-color: #005fa3;
+}
+
+/* Compact Temperature Graph Styles */
+.temperature-graph-compact {
+  margin: 1rem 0 0 0;
+  padding: 0.5rem;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  background: #f9f9f9;
+}
+
+.chart-container-compact {
+  position: relative;
+  height: 200px;
+  width: 100%;
+}
+
+/* Remove the old separate temperature graph styles */
+.temperature-graph {
+  display: none;
+}
+
+.chart-container {
+  display: none;
 }

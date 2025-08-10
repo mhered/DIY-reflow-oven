@@ -46,7 +46,7 @@ time.sleep(5)
 # Temperature Simulation parameters
 AMBIENT_TEMP = 25 	# C
 NOISE = 0.1 		# C
-HEATING = 0.4 		# C/sec
+HEATING = 0.5 		# C/sec
 COOLING_K = 0.08 		# Newton's cooling constant
 
 temperature = AMBIENT_TEMP  # Start at ambient temperature

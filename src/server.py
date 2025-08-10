@@ -13,6 +13,10 @@ class WebServer:
         
         # Initialize profile manager
         self.profile_manager = ProfileManager()
+        
+        # Temperature data for graphing
+        self.temp_data_points = []
+        self.profile_start_time = None
 
         self.setup_routes()
 
@@ -61,6 +65,10 @@ class WebServer:
                 return {'status': 'error', 'message': 'Profile name required'}, 400
             
             if self.profile_manager.start_profile(profile_name):
+                # Clear previous temperature data and record start time
+                self.temp_data_points = []
+                import time
+                self.profile_start_time = time.time()
                 return {'status': 'ok', 'message': 'Started profile: {}'.format(profile_name)}
             else:
                 return {'status': 'error', 'message': 'Profile not found'}, 404
@@ -71,7 +79,43 @@ class WebServer:
             self.profile_manager.stop_profile()
             # Set heater target to None when profile is stopped
             self.heater.set_target_temp(None)
+            # Clear temperature data when profile stops
+            self.temp_data_points = []
+            self.profile_start_time = None
             return {'status': 'ok', 'message': 'Profile stopped'}
+        
+        @self.app.route('/profile/data')
+        def get_profile_data(request):
+            """ Get profile data for graphing """
+            try:
+                profile_name = request.args.get('name')
+                if not profile_name:
+                    return {'status': 'error', 'message': 'Profile name required'}, 400
+                
+                # Get profile data from profile manager
+                profile_data = self.profile_manager.get_profile_graph_data(profile_name)
+                if profile_data:
+                    return {'status': 'ok', 'data': profile_data}
+                else:
+                    return {'status': 'error', 'message': 'Profile not found'}, 404
+            except Exception as e:
+                print("Error in profile/data endpoint: {}".format(e))
+                return {'status': 'error', 'message': 'Server error'}, 500
+        
+        @self.app.route('/temperature/data')
+        def get_temperature_data(request):
+            """ Get measured temperature data for graphing """
+            try:
+                # Send all data (already limited to 50 points max)
+                return {
+                    'status': 'ok',
+                    'data': self.temp_data_points,
+                    'profile_active': self.profile_manager.is_active
+                }
+            except Exception as e:
+                print("Error in temperature/data endpoint: {}".format(e))
+                return {'status': 'error', 'message': 'Server error'}, 500
+            
         @self.app.route('/profile/create')
         def create_profile(request):
             """ Create a new profile """
@@ -125,6 +169,27 @@ class WebServer:
     def serve_temperature_once(self, temp):
         """Called from main.py to update the current temperature reading for the web interface"""
         self.current_temp = temp
+        
+        # Collect temperature data for graphing when profile is active
+        if self.profile_manager.is_active and self.profile_start_time is not None:
+            import time
+            elapsed_minutes = (time.time() - self.profile_start_time) / 60.0
+            
+            # Only collect data every 10 seconds to reduce memory usage
+            # This means we sample roughly every 0.17 minutes
+            should_record = (len(self.temp_data_points) == 0 or 
+                           elapsed_minutes - self.temp_data_points[-1]['time'] >= 0.15)
+            
+            if should_record:
+                self.temp_data_points.append({
+                    'time': round(elapsed_minutes, 2),
+                    'temperature': round(temp, 1)
+                })
+                
+                # Keep only recent data - much smaller limit for MicroPython
+                # Keep last 50 points (about 8-10 minutes of data at 10-second intervals)
+                if len(self.temp_data_points) > 50:
+                    self.temp_data_points = self.temp_data_points[-50:]
     
     def serve_heater_state_once(self, heater_on):
         """Called from main.py to update the current heater state for the web interface"""
