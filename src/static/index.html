@@ -9,61 +9,164 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script>
     let interval = null;
+    let temperatureInterval = null; // For graph updates
+    let currentGraphProfile = '';
+    let isGraphSynced = false;
+    let wasProfileActive = false; // Track previous profile state
+
+    function handleGraphSync(data) {
+      console.log('Graph sync check:', data.graph_active, data.graph_profile, 'Current chart:', !!temperatureChart);
+      
+      // Check if we need to sync the graph state across clients
+      if (data.graph_active && data.graph_profile) {
+        // Server says a profile is running and graph should be active
+        if (!temperatureChart || currentGraphProfile !== data.graph_profile) {
+          // Check if this is a sync from another client (graph wasn't already running)
+          const wasNotRunning = !temperatureChart;
+          
+          console.log('Showing graph for profile:', data.graph_profile, 'Was not running:', wasNotRunning);
+          
+          // We need to show the graph for this profile
+          currentGraphProfile = data.graph_profile;
+          loadProfileForGraph(data.graph_profile);
+          showTemperatureGraph();
+          isGraphSynced = true;
+          
+          // Start temperature graph updates for synced graphs too
+          if (temperatureInterval) {
+            clearInterval(temperatureInterval);
+          }
+          temperatureInterval = setInterval(updateMeasuredTemperature, 12000); // Every 12 seconds
+          
+          // Show a message if this was started from another client
+          if (wasNotRunning) {
+            showFeedback(`Graph synchronized - Profile "${data.graph_profile}" running from another device`, 'info');
+          }
+        }
+      } else if (!data.graph_active && temperatureChart && document.getElementById('graphControls').style.display !== 'block') {
+        // Server says no profile is running, but we have a graph AND clear button isn't already shown
+        // This means profile was stopped, show clear button
+        console.log('Profile stopped by sync, showing clear button');
+        if (temperatureInterval) {
+          clearInterval(temperatureInterval);
+          temperatureInterval = null;
+        }
+        document.getElementById('graphControls').style.display = 'block';
+      }
+    }
 
     function updateTemp() {
       fetch('/temperature')
-        .then(res => res.json())
+        .then(res => {
+          if (!res.ok) {
+            throw new Error(`HTTP ${res.status}`);
+          }
+          return res.json();
+        })
         .then(data => {
-          document.getElementById("currentTemp").innerText = data.temp + " °C";
+          console.log('Temperature data received:', data); // Debug log
+          
+          // Update temperature display with proper fallbacks
+          const currentTemp = data.temp !== undefined && data.temp !== null ? data.temp : '--';
+          document.getElementById("currentTemp").innerText = currentTemp + (currentTemp !== '--' ? ' °C' : '');
           
           // Display target temperature or "--" if not set
-          const targetDisplay = data.target !== null ? data.target + " °C" : "--";
+          const targetTemp = data.target !== undefined && data.target !== null ? data.target : '--';
+          const targetDisplay = targetTemp !== '--' ? targetTemp + " °C" : "--";
           document.getElementById("currentTarget").innerText = targetDisplay;
 
-          // Update profile status if available
-          if (data.profile_status) {
-            const status = data.profile_status;
-            const statusText = status.active ? 
-              `Running: ${status.profile_name} (${status.current_phase})` : 
-              'Stopped';
-            document.getElementById("profileStatus").innerText = statusText;
-            
-            // Update timer display
-            const timerDiv = document.getElementById("profileTimer");
-            if (status.active) {
-              timerDiv.style.display = "block";
-              
-              // Format time as MM:SS
-              const formatTime = (minutes) => {
-                const mins = Math.floor(minutes);
-                const secs = Math.floor((minutes - mins) * 60);
-                return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-              };
-              
-              document.getElementById("elapsedTime").innerText = formatTime(status.elapsed_minutes);
-              
-              const remaining = Math.max(0, status.total_minutes - status.elapsed_minutes);
-              document.getElementById("remainingTime").innerText = formatTime(remaining);
-              
-              // Update progress bar
-              const progressFill = document.getElementById("progressFill");
-              progressFill.style.width = `${status.progress_percent}%`;
-            } else {
-              timerDiv.style.display = "none";
-            }
+          // Handle graph synchronization across clients
+          try {
+            handleGraphSync(data);
+          } catch (error) {
+            console.warn('Graph sync error:', error);
           }
 
-          const heaterIcon = document.getElementById("heaterStatus");
-          if (data.heater_on) {
-            heaterIcon.style.display = "inline";
-          } else {
-            heaterIcon.style.display = "none";
+          // Update profile status if available
+          try {
+            if (data.profile_status && typeof data.profile_status === 'object') {
+              const status = data.profile_status;
+              const statusText = status.active ? 
+                `Running: ${status.profile_name || 'Unknown'} (${status.current_phase || 'Unknown'})` : 
+                'Stopped';
+              document.getElementById("profileStatus").innerText = statusText;
+              
+              // Check if profile just finished (was active, now inactive)
+              if (wasProfileActive && !status.active && temperatureChart) {
+                console.log('Profile completed, showing clear button');
+                if (temperatureInterval) {
+                  clearInterval(temperatureInterval);
+                  temperatureInterval = null;
+                }
+                document.getElementById('graphControls').style.display = 'block';
+              }
+              
+              // Update the tracking variable
+              wasProfileActive = status.active;
+              
+              // Update timer display
+              const timerDiv = document.getElementById("profileTimer");
+              if (status.active) {
+                timerDiv.style.display = "block";
+                
+                // Format time as MM:SS
+                const formatTime = (minutes) => {
+                  const mins = Math.floor(minutes);
+                  const secs = Math.floor((minutes - mins) * 60);
+                  return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+                };
+                
+                document.getElementById("elapsedTime").innerText = formatTime(status.elapsed_minutes || 0);
+                
+                const remaining = Math.max(0, (status.total_minutes || 0) - (status.elapsed_minutes || 0));
+                document.getElementById("remainingTime").innerText = formatTime(remaining);
+                
+                // Update progress bar
+                const progressFill = document.getElementById("progressFill");
+                progressFill.style.width = `${status.progress_percent || 0}%`;
+              } else {
+                timerDiv.style.display = "none";
+              }
+            } else {
+              // No profile status - ensure we show "Stopped"
+              document.getElementById("profileStatus").innerText = 'Stopped';
+              wasProfileActive = false;
+            }
+          } catch (error) {
+            console.warn('Profile status update error:', error);
+            document.getElementById("profileStatus").innerText = 'Stopped';
+            wasProfileActive = false;
+          }
+
+          // Update heater icon
+          try {
+            const heaterIcon = document.getElementById("heaterStatus");
+            if (data.heater_on) {
+              heaterIcon.style.display = "inline";
+            } else {
+              heaterIcon.style.display = "none";
+            }
+          } catch (error) {
+            console.warn('Heater status update error:', error);
           }
         })
         .catch(error => {
           console.error('Error fetching temperature:', error);
-          document.getElementById("currentTemp").innerText = "Error";
-          document.getElementById("currentTarget").innerText = "Error";
+          
+          // Show user-friendly error messages
+          if (error.message.includes('HTTP 404')) {
+            document.getElementById("profileStatus").innerText = "Server not configured";
+          } else if (error.message.includes('HTTP 500')) {
+            document.getElementById("profileStatus").innerText = "Server error";
+          } else if (error.message.includes('fetch') || error.name === 'TypeError') {
+            document.getElementById("profileStatus").innerText = "Device offline";
+            document.getElementById("currentTemp").innerText = "--";
+            document.getElementById("currentTarget").innerText = "--";
+          } else {
+            // For parsing or other errors, show specific error but keep trying
+            console.warn('Temperature data parsing error:', error.message);
+            document.getElementById("profileStatus").innerText = "Data error";
+          }
         });
     }
 
@@ -107,9 +210,18 @@
         .then(data => {
           if (data.status === 'ok') {
             showFeedback(data.message, 'success');
+            console.log('Profile started, showing graph for:', profileName);
             // Show graph and load profile data
+            currentGraphProfile = profileName;
             loadProfileForGraph(profileName);
             showTemperatureGraph();
+            isGraphSynced = false; // This was started locally, not synced
+            
+            // Start temperature graph updates
+            if (temperatureInterval) {
+              clearInterval(temperatureInterval);
+            }
+            temperatureInterval = setInterval(updateMeasuredTemperature, 12000); // Every 12 seconds
           } else {
             showFeedback(data.message || 'Error starting profile', 'error');
           }
@@ -121,21 +233,67 @@
     }
 
     function stopProfile() {
+      console.log('Stop button clicked');
       fetch('/profile/stop')
-        .then(res => res.json())
+        .then(response => {
+          console.log('Stop response status:', response.status, 'OK:', response.ok);
+          console.log('Response headers:', response.headers);
+          if (!response.ok) {
+            return response.text().then(text => {
+              console.error('Stop response error text:', text);
+              throw new Error(`HTTP ${response.status}: ${text}`);
+            });
+          }
+          return response.json();
+        })
         .then(data => {
-          if (data.status === 'ok') {
-            showFeedback(data.message, 'success');
-            // Hide graph when profile stops
-            hideTemperatureGraph();
-          } else {
-            showFeedback(data.message || 'Error stopping profile', 'error');
+          console.log('Profile stopped successfully:', data);
+          showFeedback(data.message || 'Profile stopped', 'success');
+          
+          if (temperatureInterval) {
+            console.log('Clearing temperature interval');
+            clearInterval(temperatureInterval);
+            temperatureInterval = null;
+          }
+          
+          if (temperatureChart) {
+            // Show the clear button instead of hiding the chart immediately
+            console.log('Showing clear button after manual stop');
+            document.getElementById('graphControls').style.display = 'block';
           }
         })
         .catch(error => {
           console.error('Error stopping profile:', error);
           showFeedback('Network error stopping profile', 'error');
         });
+    }
+
+    function clearGraph() {
+      if (temperatureChart) {
+        // Call server to clear the data
+        fetch('/profile/clear', { method: 'POST' })
+          .then(response => response.json())
+          .then(data => {
+            console.log('Graph data cleared on server:', data);
+            // Now clear the client-side graph
+            temperatureChart.destroy();
+            temperatureChart = null;
+            document.getElementById('temperatureGraphContainer').style.display = 'none';
+            document.getElementById('graphControls').style.display = 'none';
+            currentGraphProfile = '';
+            isGraphSynced = false;
+          })
+          .catch(error => {
+            console.error('Error clearing graph data:', error);
+            // Clear client-side anyway
+            temperatureChart.destroy();
+            temperatureChart = null;
+            document.getElementById('temperatureGraphContainer').style.display = 'none';
+            document.getElementById('graphControls').style.display = 'none';
+            currentGraphProfile = '';
+            isGraphSynced = false;
+          });
+      }
     }
 
     let phaseCounter = 0;
@@ -306,12 +464,16 @@
       }
       
       feedback.textContent = message;
-      feedback.className = type; // 'success' or 'error'
+      feedback.className = type; // 'success', 'error', or 'info'
       
       if (type === 'success') {
         feedback.style.backgroundColor = '#d4edda';
         feedback.style.color = '#155724';
         feedback.style.border = '1px solid #c3e6cb';
+      } else if (type === 'info') {
+        feedback.style.backgroundColor = '#d1ecf1';
+        feedback.style.color = '#0c5460';
+        feedback.style.border = '1px solid #bee5eb';
       } else {
         feedback.style.backgroundColor = '#f8d7da';
         feedback.style.color = '#721c24';
@@ -330,7 +492,6 @@
     // Temperature graphing functionality
     let temperatureChart = null;
     let profileData = null;
-    let graphUpdateCounter = 0;
 
     function createTemperatureChart() {
       const ctx = document.getElementById('temperatureChart').getContext('2d');
@@ -374,11 +535,7 @@
               type: 'linear',
               position: 'bottom',
               title: {
-                display: true,
-                text: 'Time (min)',
-                font: {
-                  size: 10
-                }
+                display: false  // Hide the default title
               },
               ticks: {
                 font: {
@@ -411,18 +568,53 @@
           },
           plugins: {
             legend: {
-              display: true,
-              position: 'top',
-              labels: {
-                font: {
-                  size: 10
-                },
-                padding: 8,
-                usePointStyle: true,
-                pointStyle: 'line'
-              }
+              display: false  // We'll draw custom legend
             }
           }
+        }
+      });
+      
+      // Add custom legend and time axis label inside the chart
+      Chart.register({
+        id: 'customLabels',
+        afterDraw: function(chart) {
+          const ctx = chart.ctx;
+          const chartArea = chart.chartArea;
+          
+          ctx.save();
+          ctx.font = '9px Segoe UI, Roboto, sans-serif';
+          ctx.fillStyle = '#666';
+          
+          // Draw time label in bottom right
+          ctx.textAlign = 'right';
+          ctx.textBaseline = 'bottom';
+          ctx.fillText('Time (min)', chartArea.right - 5, chartArea.bottom - 2);
+          
+          // Draw custom legend in top left
+          ctx.textAlign = 'left';
+          ctx.textBaseline = 'top';
+          
+          const legendY = chartArea.top + 5;
+          const legendX = chartArea.left + 5;
+          
+          // Target line legend
+          ctx.strokeStyle = 'rgb(255, 99, 132)';
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.moveTo(legendX, legendY + 5);
+          ctx.lineTo(legendX + 15, legendY + 5);
+          ctx.stroke();
+          ctx.fillText('Target', legendX + 20, legendY);
+          
+          // Measured line legend
+          ctx.strokeStyle = 'rgb(54, 162, 235)';
+          ctx.beginPath();
+          ctx.moveTo(legendX + 70, legendY + 5);
+          ctx.lineTo(legendX + 85, legendY + 5);
+          ctx.stroke();
+          ctx.fillText('Measured', legendX + 90, legendY);
+          
+          ctx.restore();
         }
       });
     }
@@ -483,10 +675,10 @@
             temperatureChart.data.datasets[1].data = measuredData;
             temperatureChart.update('none');
           } else if (!data.profile_active) {
-            // Clear measured data and hide graph when profile is not active
+            // Just clear measured data when profile is not active, don't hide graph
             temperatureChart.data.datasets[1].data = [];
             temperatureChart.update('none');
-            hideTemperatureGraph();
+            // Don't call hideTemperatureGraph() here - let handleGraphSync manage it
           }
         })
         .catch(error => {
@@ -510,20 +702,34 @@
     }
 
     window.onload = () => {
-      updateTemp();
-      loadProfiles();
-      createTemperatureChart();
-      interval = setInterval(() => {
-        updateTemp();
-        
-        // Update graph much less frequently to reduce memory pressure
-        // Every 6th update = every 12 seconds
-        graphUpdateCounter++;
-        if (graphUpdateCounter >= 6) {
-          updateMeasuredTemperature();
-          graphUpdateCounter = 0;
-        }
-      }, 2000);
+      // Test basic connectivity first
+      console.log('Testing server connectivity...');
+      fetch('/temperature')
+        .then(res => {
+          console.log('Server response status:', res.status);
+          if (res.ok) {
+            console.log('Server connectivity: OK');
+            // Server is working, start normal operations
+            updateTemp();
+            loadProfiles();
+            createTemperatureChart();
+            interval = setInterval(updateTemp, 2000);
+          } else {
+            console.error('Server connectivity: FAILED - HTTP', res.status);
+            document.getElementById("profileStatus").innerText = `Server Error ${res.status}`;
+            document.getElementById("currentTemp").innerText = "--";
+            document.getElementById("currentTarget").innerText = "--";
+          }
+        })
+        .catch(error => {
+          console.error('Server connectivity: FAILED -', error.message);
+          document.getElementById("profileStatus").innerText = 'Device Offline - Check MicroPython';
+          document.getElementById("currentTemp").innerText = "--";
+          document.getElementById("currentTarget").innerText = "--";
+          
+          // Try to start basic chart anyway for when server comes online
+          createTemperatureChart();
+        });
     };
   </script>
 </head>
@@ -532,15 +738,21 @@
   <div class="container">
     <h1>Temperature</h1>
   
-    <div class="temperature">
-      <div class="temp-wrapper">
-        <span id="currentTemp">--</span>
-        <span id="heaterStatus">🔥</span>
+    <div class="temperature-display">
+      <div class="temp-section">
+        <div class="temp-value">
+          <span id="currentTemp">--</span>
+          <span id="heaterStatus">🔥</span>
+        </div>
+        <div class="temp-label">Current</div>
       </div>
-    </div>
-
-    <div class="target-display">
-      <label>Current Target: <span id="currentTarget">--</span></label>
+      
+      <div class="target-section">
+        <div class="temp-value">
+          <span id="currentTarget">--</span>
+        </div>
+        <div class="temp-label">Target</div>
+      </div>
     </div>
 
     <div class="profile-section">
@@ -565,6 +777,9 @@
           <div id="temperatureGraphContainer" class="temperature-graph-compact" style="display: none;">
             <div class="chart-container-compact">
               <canvas id="temperatureChart"></canvas>
+            </div>
+            <div id="graphControls" class="graph-controls" style="display: none;">
+              <button id="clearButton" onclick="clearGraph()" class="clear-graph-btn">Clear Graph</button>
             </div>
           </div>
         </div>

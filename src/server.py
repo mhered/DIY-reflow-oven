@@ -47,6 +47,15 @@ class WebServer:
             # Add profile status
             response['profile_status'] = self.profile_manager.get_status()
             
+            # Add graph status for multi-client synchronization
+            status = self.profile_manager.get_status()
+            if status and status.get('active', False):
+                response['graph_active'] = True
+                response['graph_profile'] = status.get('profile_name', '')
+            else:
+                response['graph_active'] = False
+                response['graph_profile'] = ''
+            
             return response
 
         # Profile endpoints
@@ -64,6 +73,11 @@ class WebServer:
             if not profile_name:
                 return {'status': 'error', 'message': 'Profile name required'}, 400
             
+            # Check if a profile is already running
+            current_status = self.profile_manager.get_status()
+            if current_status and current_status.get('active', False):
+                return {'status': 'error', 'message': 'A profile is already running. Stop it first.'}, 409
+            
             if self.profile_manager.start_profile(profile_name):
                 # Clear previous temperature data and record start time
                 self.temp_data_points = []
@@ -79,10 +93,17 @@ class WebServer:
             self.profile_manager.stop_profile()
             # Set heater target to None when profile is stopped
             self.heater.set_target_temp(None)
-            # Clear temperature data when profile stops
+            # Don't clear temperature data immediately - let client show clear button
+            # self.temp_data_points = []  # Commented out - keep data for clear button
+            # self.profile_start_time = None  # Keep this for now
+            return {'status': 'ok', 'message': 'Profile stopped'}
+        
+        @self.app.route('/profile/clear', methods=['POST'])
+        def clear_graph_data(request):
+            """ Clear temperature data for graph (called by Clear button) """
             self.temp_data_points = []
             self.profile_start_time = None
-            return {'status': 'ok', 'message': 'Profile stopped'}
+            return {'status': 'ok', 'message': 'Graph data cleared'}
         
         @self.app.route('/profile/data')
         def get_profile_data(request):
@@ -170,10 +191,12 @@ class WebServer:
         """Called from main.py to update the current temperature reading for the web interface"""
         self.current_temp = temp
         
-        # Collect temperature data for graphing when profile is active
-        if self.profile_manager.is_active and self.profile_start_time is not None:
+        # Collect temperature data for graphing if profile is running
+        status = self.profile_manager.get_status()
+        if status and status.get('active', False) and self.profile_start_time is not None:
             import time
-            elapsed_minutes = (time.time() - self.profile_start_time) / 60.0
+            current_time = time.time()
+            elapsed_minutes = (current_time - self.profile_start_time) / 60.0
             
             # Only collect data every 10 seconds to reduce memory usage
             # This means we sample roughly every 0.17 minutes
