@@ -9,6 +9,8 @@ Bought the following elements instead:
 | 1    | [ARCELI MAX6675 module + K-type thermocouple](./BOM/sensor.md) | ![](./BOM/assets/sensor.jpg) | K-type thermocouple module with MAX6675, 0–600 °C range, SPI output | [Amazon](https://www.amazon.es/dp/B07MY36P9Y) | 7.99           | 1         | 7.99           | 7.99         |
 | 1    | [SSR-50DA Solid State Relay](./BOM/ssr.md)                   | ![](./BOM/assets/SSR.jpg)    | DC 3–32 V input, AC 24–380 V output, 50A max, for heater control | [Amazon](https://www.amazon.es/dp/B08FX1DDJM) | 9.59           | 1         | 9.59           | 9.59         |
 | 1    | [Cecotec Bake&Toast 1090 Oven](./BOM/oven.md)                | ![](./BOM/assets/oven.jpg)   | 10 L tabletop oven, 1000 W, 60 min timer, up to 230 °C       | [Amazon](https://www.amazon.es/dp/B0BQ13YSVT) | 31.90          | 1         | 31.90          | 31.90        |
+| 1    | Raspberry Pico WH                                            |                              |                                                              |                                               |                |           |                |              |
+| 1    | SSD1306 OLED                                                 |                              |                                                              |                                               |                |           |                |              |
 
 Also used a Raspberry Pico WH and a SSD1306 OLED screen I had around
 
@@ -121,12 +123,14 @@ Next we refactor to add support for temperature profiles and disable manual targ
 - `profile.py` - classes for multi-phase temperature control with JSON serialization
 - `profile_manager.py` functions to manage profile execution, file persistence, and state tracking
 - new `profiles/` folder to store temperature profiles as JSON files
+  - [low_temp.json](./src/profiles/low_temp.json) profile based on [this datasheet](./assets/low_temp_solder_paste_datasheet.pdf) for Sn42Bi57Ag1 Low Temperature Solder Paste
+
 
 ![](./assets/server_v3.png)
 
 ## Step 5 - Plot temperature graphs
 
-
+![](./assets/server_v4.png)
 
 
 
