@@ -14,10 +14,15 @@ class ProfileManager:
     def __init__(self, profiles_directory="profiles"):
         self.profiles_directory = profiles_directory
         self.profiles = {}
-        self.current_profile = None
-        self.is_active = False
+        
+        # NEW: Core state variables for the 3-state model
+        self.active_profile_name = None  # Which profile is selected/active
+        self.is_running = False          # Boolean: is the active profile executing
         self.start_time = None
         self.elapsed_minutes = 0.0
+        
+        # NEW: Temperature data collection 
+        self.temperature_data = []       # Always collected when profile active
         
         # Ensure profiles directory exists (MicroPython compatible)
         try:
@@ -154,45 +159,27 @@ class ProfileManager:
                 del self.profiles[name]
                 print("Deleted profile: {}".format(name))
                 
-                # If this was the current profile, stop execution
-                if self.current_profile and self.current_profile.name == name:
-                    self.stop_profile()
+                # If this was the active profile, deactivate it
+                if self.active_profile_name == name:
+                    self.deactivate_profile()
+                
                 return True
         except Exception as e:
             print("Error deleting profile: {}".format(e))
         return False
     
-    def start_profile(self, profile_name):
-        """Start executing a profile"""
-        profile = self.profiles.get(profile_name)
-        if not profile:
-            print("Error: Profile '{}' not found".format(profile_name))
-            return False
-        
-        self.current_profile = profile
-        self.is_active = True
-        self.start_time = time.time()
-        self.elapsed_minutes = 0.0
-        
-        print("Started profile: '{}' at time {}".format(profile_name, self.start_time))
-        print("Profile has {} phases, total duration: {} minutes".format(
-            len(profile.phases), profile.total_duration))
-        return True
-    
-    def stop_profile(self):
-        """Stop profile execution"""
-        self.is_active = False
-        self.current_profile = None
-        self.start_time = None
-        self.elapsed_minutes = 0.0
-        print("Profile execution stopped")
-    
     def update(self):
         """
         Update profile execution and return current target temperature
-        Returns None if no profile is active
+        Returns None if no profile is running
         """
-        if not self.is_active or not self.current_profile or not self.start_time:
+        if not self.is_running or not self.active_profile_name or not self.start_time:
+            return None
+        
+        profile = self.profiles.get(self.active_profile_name)
+        if not profile:
+            print("Error: Active profile '{}' not found".format(self.active_profile_name))
+            self.stop_active_profile()
             return None
         
         # Calculate elapsed time
@@ -200,50 +187,73 @@ class ProfileManager:
         self.elapsed_minutes = (current_time - self.start_time) / 60.0
         
         # Check if profile is complete
-        if self.current_profile.is_complete(self.elapsed_minutes):
+        if profile.is_complete(self.elapsed_minutes):
             print("Profile '{}' completed after {:.2f} minutes".format(
-                self.current_profile.name, self.elapsed_minutes))
-            self.stop_profile()
+                self.active_profile_name, self.elapsed_minutes))
+            self.stop_active_profile()  # Auto-stop but keep profile active for graph viewing
             return None
         
         # Get current target temperature
-        phase_index, phase_name, target_temp = self.current_profile.get_current_phase_and_target(self.elapsed_minutes)
+        phase_index, phase_name, target_temp = profile.get_current_phase_and_target(self.elapsed_minutes)
+        
         # Only print status every 30 seconds to avoid spam
         if int(self.elapsed_minutes * 2) % 60 == 0:  # Every 30 seconds
             print("Profile '{}': {:.1f}min, {}, {:.1f}°C".format(
-                self.current_profile.name, self.elapsed_minutes, phase_name, target_temp))
+                self.active_profile_name, self.elapsed_minutes, phase_name, target_temp))
+        
         return target_temp
     
     def get_status(self):
-        """Get current profile execution status"""
-        # Update elapsed time first
-        if self.is_active and self.current_profile and self.start_time:
+        """Get current profile execution status with UI state"""
+        # Update elapsed time first if running
+        if self.is_running and self.active_profile_name and self.start_time:
             current_time = time.time()
             self.elapsed_minutes = (current_time - self.start_time) / 60.0
         
-        if not self.is_active or not self.current_profile:
+        # Get profile object if active
+        profile = self.profiles.get(self.active_profile_name) if self.active_profile_name else None
+        
+        if not self.active_profile_name or not profile:
             return {
-                'active': False,
-                'profile_name': None,
-                'current_phase': None,
-                'target_temp': None,
-                'elapsed_minutes': 0,
-                'total_minutes': 0,
-                'progress_percent': 0
+                # NEW: Core UI state fields
+                'active_profile_name': self.active_profile_name,
+                'is_running': self.is_running,
+                'show_graph': self.show_graph(),
+                'show_clear_button': self.show_clear_button(),
+                'can_select': self.can_select(),
+                'can_create': self.can_create(),
+                'can_run': self.can_run(),
+                'can_stop': self.can_stop(),
+                'can_clear': self.can_clear()
             }
         
-        phase_index, phase_name, target_temp = self.current_profile.get_current_phase_and_target(self.elapsed_minutes)
-        progress_percent = min(100, (self.elapsed_minutes / self.current_profile.total_duration) * 100)
+        # Get current phase and target if running
+        if self.is_running:
+            phase_index, phase_name, target_temp = profile.get_current_phase_and_target(self.elapsed_minutes)
+        else:
+            phase_index, phase_name, target_temp = 0, "Stopped", None
+        
+        progress_percent = min(100, (self.elapsed_minutes / profile.total_duration) * 100) if profile.total_duration > 0 else 0
         
         return {
-            'active': True,
-            'profile_name': self.current_profile.name,
+            # Core UI state fields  
+            'active_profile_name': self.active_profile_name,
+            'is_running': self.is_running,
+            'show_graph': self.show_graph(),
+            'show_clear_button': self.show_clear_button(),
+            'can_select': self.can_select(),
+            'can_create': self.can_create(),
+            'can_run': self.can_run(),
+            'can_stop': self.can_stop(),
+            'can_clear': self.can_clear(),
+            
+            # Profile execution fields
             'current_phase': phase_name,
             'current_phase_index': phase_index,
-            'total_phases': len(self.current_profile.phases),
+            'total_phases': len(profile.phases),
             'target_temp': target_temp,
             'elapsed_minutes': self.elapsed_minutes,
-            'total_minutes': self.current_profile.total_duration,
+            'total_minutes': profile.total_duration,
             'progress_percent': progress_percent
         }
     
@@ -325,3 +335,148 @@ class ProfileManager:
             'total_duration': round(total_minutes, 2),
             'points': points
         }
+    
+    # NEW: State query methods for UI
+    def show_graph(self):
+        """Show graph when any profile is active"""
+        return self.active_profile_name is not None
+    
+    def show_clear_button(self):
+        """Show clear button when profile is active but not running"""
+        return self.active_profile_name is not None and not self.is_running
+    
+    def can_select(self):
+        """Can select profile when no profile is active"""
+        return self.active_profile_name is None
+    
+    def can_create(self):
+        """Can create profile when no profile is active"""
+        return self.active_profile_name is None
+    
+    def can_run(self):
+        """Can run when profile is active but not running"""
+        return self.active_profile_name is not None and not self.is_running
+    
+    def can_stop(self):
+        """Can stop when profile is active and running"""
+        return self.active_profile_name is not None and self.is_running
+    
+    def can_clear(self):
+        """Can clear when profile is active but not running"""
+        return self.active_profile_name is not None and not self.is_running
+    
+    # NEW: State transition methods
+    def activate_profile(self, profile_name):
+        """Select a profile (make it active but not running)"""
+        if profile_name not in self.profiles:
+            print("Error: Profile '{}' not found".format(profile_name))
+            return False
+        
+        if self.is_running:
+            print("Error: Cannot select profile while another is running")
+            return False
+        
+        # Clear any previous data
+        self.clear_temperature_data()
+        
+        # Set new active profile
+        self.active_profile_name = profile_name
+        self.is_running = False
+        self.start_time = None
+        self.elapsed_minutes = 0.0
+        
+        print("Activated profile: '{}'".format(profile_name))
+        return True
+    
+    def deactivate_profile(self):
+        """Clear the active profile (Clear button functionality)"""
+        # Note: Caller should stop profile first if needed
+        # This is now handled by the clear endpoint
+        
+        profile_name = self.active_profile_name
+        
+        # Clear all state
+        self.active_profile_name = None
+        self.is_running = False
+        self.start_time = None
+        self.elapsed_minutes = 0.0
+        self.clear_temperature_data()
+        
+        print("Deactivated profile: '{}'".format(profile_name if profile_name else "None"))
+        return True
+    
+    def start_active_profile(self):
+        """Start running the currently active profile"""
+        if not self.active_profile_name:
+            print("Error: No profile is active")
+            return False
+        
+        if self.is_running:
+            print("Error: Profile is already running")
+            return False
+        
+        profile = self.profiles[self.active_profile_name]
+        
+        # Start execution
+        self.is_running = True
+        self.start_time = time.time()
+        self.elapsed_minutes = 0.0
+        self.clear_temperature_data()  # Start fresh data collection
+        
+        print("Started profile: '{}' at time {}".format(self.active_profile_name, self.start_time))
+        print("Profile has {} phases, total duration: {} minutes".format(
+            len(profile.phases), profile.total_duration))
+        return True
+    
+    def stop_active_profile(self):
+        """Stop running the active profile (keep it active for graph viewing)"""
+        if not self.is_running:
+            print("Error: No profile is running")
+            return False
+        
+        self.is_running = False
+        # Keep active_profile_name, start_time, elapsed_minutes, and temperature_data
+        # This allows viewing the graph and potentially running again
+        
+        print("Stopped profile: '{}'".format(self.active_profile_name))
+        return True
+    
+    # NEW: Temperature data collection methods
+    def add_temperature_reading(self, temperature):
+        """Add temperature reading if profile is active"""
+        if not self.active_profile_name:
+            return  # No active profile, don't collect data
+        
+        if not self.start_time:
+            return  # No start time set, don't collect data
+        
+        current_time = time.time()
+        elapsed_minutes = (current_time - self.start_time) / 60.0
+        
+        # Only collect data every 10 seconds to reduce memory usage (0.17 minutes)
+        should_record = (len(self.temperature_data) == 0 or 
+                        elapsed_minutes - self.temperature_data[-1]['time'] >= 0.15)
+        
+        if should_record:
+            self.temperature_data.append({
+                'time': round(elapsed_minutes, 2),
+                'temperature': round(temperature, 1)
+            })
+            
+            # Keep only recent data - limit for MicroPython memory
+            # Keep last 50 points (about 8-10 minutes of data at 10-second intervals)
+            if len(self.temperature_data) > 50:
+                self.temperature_data = self.temperature_data[-50:]
+    
+    def get_temperature_data(self):
+        """Get collected temperature data for graphing"""
+        return {
+            'status': 'ok',
+            'data': self.temperature_data,
+            'profile_active': self.active_profile_name is not None,
+            'profile_running': self.is_running
+        }
+    
+    def clear_temperature_data(self):
+        """Clear temperature data (called by deactivate and start)"""
+        self.temperature_data = []

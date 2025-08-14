@@ -13,15 +13,35 @@ class WebServer:
         
         # Initialize profile manager
         self.profile_manager = ProfileManager()
-        
-        # Temperature data for graphing
-        self.temp_data_points = []
-        self.profile_start_time = None
 
         self.setup_routes()
 
         # Start web server in background thread
         _thread.start_new_thread(self.app.run, (), {'host': '0.0.0.0', 'port': 80})
+    
+    def url_decode(self, encoded_string):
+        """URL decode a string - MicroPython compatible"""
+        try:
+            # Handle common URL encodings manually
+            decoded = encoded_string.replace('%20', ' ')  # Space
+            decoded = decoded.replace('%21', '!')         # Exclamation mark
+            decoded = decoded.replace('%22', '"')         # Quote
+            decoded = decoded.replace('%23', '#')         # Hash
+            decoded = decoded.replace('%24', '$')         # Dollar
+            decoded = decoded.replace('%25', '%')         # Percent
+            decoded = decoded.replace('%26', '&')         # Ampersand
+            decoded = decoded.replace('%27', "'")         # Apostrophe
+            decoded = decoded.replace('%28', '(')         # Left parenthesis
+            decoded = decoded.replace('%29', ')')         # Right parenthesis
+            decoded = decoded.replace('%2A', '*')         # Asterisk
+            decoded = decoded.replace('%2B', '+')         # Plus
+            decoded = decoded.replace('%2C', ',')         # Comma
+            decoded = decoded.replace('%2D', '-')         # Hyphen
+            decoded = decoded.replace('%2E', '.')         # Period
+            decoded = decoded.replace('%2F', '/')         # Forward slash
+            return decoded
+        except:
+            return encoded_string  # Return original if decoding fails
 
     def setup_routes(self):
         @self.app.route('/')
@@ -36,25 +56,16 @@ class WebServer:
 
         @self.app.route('/temperature')
         def temperature(request):
-            """ Get current, target temperature and heater state """
+            """ Get current, target temperature and heater state with UI state """
             target_temp = self.heater.get_target_temp()
+            status = self.profile_manager.get_status()
+            
             response = {
                 'temp': round(self.current_temp, 1),
                 'target': round(target_temp, 1) if target_temp is not None else None,
-                'heater_on': self.heater_on
+                'heater_on': self.heater_on,
+                'ui_state': status  # Complete UI state from ProfileManager
             }
-            
-            # Add profile status
-            response['profile_status'] = self.profile_manager.get_status()
-            
-            # Add graph status for multi-client synchronization
-            status = self.profile_manager.get_status()
-            if status and status.get('active', False):
-                response['graph_active'] = True
-                response['graph_profile'] = status.get('profile_name', '')
-            else:
-                response['graph_active'] = False
-                response['graph_profile'] = ''
             
             return response
 
@@ -66,44 +77,83 @@ class WebServer:
                 'status': 'ok',
                 'profiles': self.profile_manager.get_profile_names()
             }
-        @self.app.route('/profile/start')
-        def start_profile(request):
-            """ Start a profile """
-            profile_name = request.args.get('name')
-            if not profile_name:
-                return {'status': 'error', 'message': 'Profile name required'}, 400
-            
-            # Check if a profile is already running
-            current_status = self.profile_manager.get_status()
-            if current_status and current_status.get('active', False):
-                return {'status': 'error', 'message': 'A profile is already running. Stop it first.'}, 409
-            
-            if self.profile_manager.start_profile(profile_name):
-                # Clear previous temperature data and record start time
-                self.temp_data_points = []
-                import time
-                self.profile_start_time = time.time()
-                return {'status': 'ok', 'message': 'Started profile: {}'.format(profile_name)}
-            else:
-                return {'status': 'error', 'message': 'Profile not found'}, 404
+        @self.app.route('/profile/<profile_name>/activate', methods=['POST'])
+        def activate_profile(request, profile_name):
+            """ Activate a profile for execution """
+            try:
+                # URL decode the profile name to handle spaces and special characters
+                decoded_name = self.url_decode(profile_name)
+                
+                success = self.profile_manager.activate_profile(decoded_name)
+                if success:
+                    return {'status': 'ok', 'message': f'Profile {decoded_name} activated'}
+                else:
+                    return {'status': 'error', 'message': f'Failed to activate profile {decoded_name}'}, 400
+            except ValueError as e:
+                return {'status': 'error', 'message': str(e)}, 400        @self.app.route('/profile/deactivate', methods=['POST'])
+        def deactivate_profile(request):
+            """ Deactivate the currently active profile """
+            try:
+                self.profile_manager.deactivate_profile()
+                return {'status': 'ok', 'message': 'Profile deactivated'}
+            except ValueError as e:
+                return {'status': 'error', 'message': str(e)}, 400
         
-        @self.app.route('/profile/stop')
+        @self.app.route('/profile/<profile_name>/start', methods=['POST'])
+        def start_profile(request, profile_name):
+            """ Start running the active profile """
+            try:
+                # URL decode the profile name to handle spaces and special characters
+                decoded_name = self.url_decode(profile_name)
+                
+                # First activate if needed
+                if self.profile_manager.active_profile_name != decoded_name:
+                    self.profile_manager.activate_profile(decoded_name)
+                
+                # Then start running
+                self.profile_manager.start_active_profile()
+                
+                return {'status': 'ok', 'message': f'Profile {decoded_name} started'}
+            except ValueError as e:
+                return {'status': 'error', 'message': str(e)}, 400
+        
+        @self.app.route('/profile/stop', methods=['POST'])
         def stop_profile(request):
-            """ Stop current profile """
-            self.profile_manager.stop_profile()
-            # Set heater target to None when profile is stopped
-            self.heater.set_target_temp(None)
-            # Don't clear temperature data immediately - let client show clear button
-            # self.temp_data_points = []  # Commented out - keep data for clear button
-            # self.profile_start_time = None  # Keep this for now
-            return {'status': 'ok', 'message': 'Profile stopped'}
+            """ Stop the currently running profile """
+            try:
+                self.profile_manager.stop_active_profile()
+                return {'status': 'ok', 'message': 'Profile stopped'}
+            except ValueError as e:
+                return {'status': 'error', 'message': str(e)}, 400
         
-        @self.app.route('/profile/clear', methods=['POST'])
+        @self.app.route('/clear-graph-data', methods=['POST'])
         def clear_graph_data(request):
             """ Clear temperature data for graph (called by Clear button) """
-            self.temp_data_points = []
-            self.profile_start_time = None
-            return {'status': 'ok', 'message': 'Graph data cleared'}
+            try:
+                self.profile_manager.clear_temperature_data()
+                return {'status': 'ok', 'message': 'Graph data cleared'}
+            except Exception as e:
+                print("Error clearing graph data: {}".format(e))
+                return {'status': 'error', 'message': 'Failed to clear graph data'}, 500
+        
+        @self.app.route('/profile/clear', methods=['POST'])
+        def clear_profile(request):
+            """ Complete clear operation: stop profile if running, clear data, deactivate """
+            try:
+                # If profile is running, stop it first
+                if self.profile_manager.is_running:
+                    self.profile_manager.stop_active_profile()
+                
+                # Clear temperature data
+                self.profile_manager.clear_temperature_data()
+                
+                # Deactivate profile
+                self.profile_manager.deactivate_profile()
+                
+                return {'status': 'ok', 'message': 'Profile cleared successfully'}
+            except Exception as e:
+                print("Error clearing profile: {}".format(e))
+                return {'status': 'error', 'message': 'Failed to clear profile'}, 500
         
         @self.app.route('/profile/data')
         def get_profile_data(request):
@@ -113,8 +163,11 @@ class WebServer:
                 if not profile_name:
                     return {'status': 'error', 'message': 'Profile name required'}, 400
                 
+                # URL decode the profile name to handle spaces and special characters
+                decoded_name = self.url_decode(profile_name)
+                
                 # Get profile data from profile manager
-                profile_data = self.profile_manager.get_profile_graph_data(profile_name)
+                profile_data = self.profile_manager.get_profile_graph_data(decoded_name)
                 if profile_data:
                     return {'status': 'ok', 'data': profile_data}
                 else:
@@ -125,17 +178,28 @@ class WebServer:
         
         @self.app.route('/temperature/data')
         def get_temperature_data(request):
-            """ Get measured temperature data for graphing """
+            """ Get temperature data for graphing """
             try:
-                # Send all data (already limited to 50 points max)
-                return {
-                    'status': 'ok',
-                    'data': self.temp_data_points,
-                    'profile_active': self.profile_manager.is_active
-                }
+                # Use ProfileManager's temperature data
+                if self.profile_manager.active_profile_name:
+                    temp_data_response = self.profile_manager.get_temperature_data()
+                    return {
+                        'status': 'ok',
+                        'data': temp_data_response['data'],  # Extract the actual data array
+                        'profile_active': True,
+                        'profile_name': self.profile_manager.active_profile_name,
+                        'is_running': self.profile_manager.is_running
+                    }
+                else:
+                    return {
+                        'status': 'ok',
+                        'data': [],
+                        'profile_active': False,
+                        'profile_name': '',
+                        'is_running': False
+                    }
             except Exception as e:
                 print("Error in temperature/data endpoint: {}".format(e))
-                return {'status': 'error', 'message': 'Server error'}, 500
             
         @self.app.route('/profile/create')
         def create_profile(request):
@@ -144,6 +208,9 @@ class WebServer:
             profile_name = request.args.get('name')
             if not profile_name:
                 return {'status': 'error', 'message': 'Profile name required'}, 400
+            
+            # URL decode the profile name to handle spaces and special characters
+            decoded_name = self.url_decode(profile_name)
             
             # Collect phase data from multiple parameters
             phases_data = []
@@ -176,7 +243,7 @@ class WebServer:
             
             try:
                 # Create profile
-                if self.profile_manager.create_profile(profile_name, phases_data):
+                if self.profile_manager.create_profile(decoded_name, phases_data):
                     # Give file system time to sync (especially important on MicroPython)
                     import time
                     time.sleep(0.1)
@@ -191,28 +258,8 @@ class WebServer:
         """Called from main.py to update the current temperature reading for the web interface"""
         self.current_temp = temp
         
-        # Collect temperature data for graphing if profile is running
-        status = self.profile_manager.get_status()
-        if status and status.get('active', False) and self.profile_start_time is not None:
-            import time
-            current_time = time.time()
-            elapsed_minutes = (current_time - self.profile_start_time) / 60.0
-            
-            # Only collect data every 10 seconds to reduce memory usage
-            # This means we sample roughly every 0.17 minutes
-            should_record = (len(self.temp_data_points) == 0 or 
-                           elapsed_minutes - self.temp_data_points[-1]['time'] >= 0.15)
-            
-            if should_record:
-                self.temp_data_points.append({
-                    'time': round(elapsed_minutes, 2),
-                    'temperature': round(temp, 1)
-                })
-                
-                # Keep only recent data - much smaller limit for MicroPython
-                # Keep last 50 points (about 8-10 minutes of data at 10-second intervals)
-                if len(self.temp_data_points) > 50:
-                    self.temp_data_points = self.temp_data_points[-50:]
+        # Let ProfileManager handle temperature data collection
+        self.profile_manager.add_temperature_reading(temp)
     
     def serve_heater_state_once(self, heater_on):
         """Called from main.py to update the current heater state for the web interface"""

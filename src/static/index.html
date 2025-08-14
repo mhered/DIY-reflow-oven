@@ -9,49 +9,67 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script>
     let interval = null;
-    let temperatureInterval = null; // For graph updates
-    let currentGraphProfile = '';
-    let isGraphSynced = false;
-    let wasProfileActive = false; // Track previous profile state
+    let temperatureInterval = null;
+    let temperatureChart = null;
 
-    function handleGraphSync(data) {
-      console.log('Graph sync check:', data.graph_active, data.graph_profile, 'Current chart:', !!temperatureChart);
+    // Simple state-driven UI update based on ProfileManager state
+    function updateUIState(uiState) {
+      console.log('Updating UI state:', uiState);
       
-      // Check if we need to sync the graph state across clients
-      if (data.graph_active && data.graph_profile) {
-        // Server says a profile is running and graph should be active
-        if (!temperatureChart || currentGraphProfile !== data.graph_profile) {
-          // Check if this is a sync from another client (graph wasn't already running)
-          const wasNotRunning = !temperatureChart;
-          
-          console.log('Showing graph for profile:', data.graph_profile, 'Was not running:', wasNotRunning);
-          
-          // We need to show the graph for this profile
-          currentGraphProfile = data.graph_profile;
-          loadProfileForGraph(data.graph_profile);
-          showTemperatureGraph();
-          isGraphSynced = true;
-          
-          // Start temperature graph updates for synced graphs too
-          if (temperatureInterval) {
-            clearInterval(temperatureInterval);
-          }
-          temperatureInterval = setInterval(updateMeasuredTemperature, 12000); // Every 12 seconds
-          
-          // Show a message if this was started from another client
-          if (wasNotRunning) {
-            showFeedback(`Graph synchronized - Profile "${data.graph_profile}" running from another device`, 'info');
-          }
+      // Enable/disable buttons based on ProfileManager state
+      const profileSelect = document.getElementById('profileSelect');
+      const toggleFormBtn = document.getElementById('toggleFormBtn');
+      const playBtn = document.getElementById('playBtn');
+      const stopBtn = document.getElementById('stopBtn');
+      const clearBtn = document.getElementById('clearBtn');
+      
+      // Apply CSS classes for styling and disable functionality
+      profileSelect.disabled = !uiState.can_select;
+      profileSelect.className = uiState.can_select ? '' : 'disabled';
+      
+      // For buttons, use CSS classes instead of disabled attribute to maintain custom styling
+      toggleFormBtn.className = uiState.can_create ? 'control-btn' : 'control-btn disabled';
+      playBtn.className = uiState.can_run ? 'control-btn' : 'control-btn disabled';
+      stopBtn.className = uiState.can_stop ? 'control-btn' : 'control-btn disabled';
+      clearBtn.className = uiState.can_clear ? 'control-btn' : 'control-btn disabled';
+      
+      // Update tooltips based on state
+      profileSelect.title = uiState.can_select ? "Select a temperature profile to activate" : "Cannot select profile while one is active";
+      toggleFormBtn.title = uiState.can_create ? "Create a new temperature profile" : "Cannot create profile while one is active or running";
+      playBtn.title = uiState.can_run ? "Run the active profile" : "Select a profile first to enable running";
+      stopBtn.title = uiState.can_stop ? "Stop the running profile" : "No profile is currently running";
+      clearBtn.title = uiState.can_clear ? "Clear graph data and deactivate profile" : "No profile data to clear";
+      
+      // Show/hide graph and timer based on state
+      const timerDiv = document.getElementById("profileTimer");
+      if (uiState.show_graph && uiState.active_profile_name) {
+        timerDiv.style.display = "block";
+        showTemperatureGraph();
+        loadProfileForGraph(uiState.active_profile_name);
+      } else if (!uiState.show_graph) {
+        timerDiv.style.display = "none";
+        hideTemperatureGraph();
+      }
+      
+      // Temperature data updates - start/stop based on running state
+      if (uiState.is_running) {
+        if (!temperatureInterval) {
+          // Start interval and call immediately
+          updateMeasuredTemperature();
+          temperatureInterval = setInterval(updateMeasuredTemperature, 5000); // Reduced to 5 seconds
         }
-      } else if (!data.graph_active && temperatureChart && document.getElementById('graphControls').style.display !== 'block') {
-        // Server says no profile is running, but we have a graph AND clear button isn't already shown
-        // This means profile was stopped, show clear button
-        console.log('Profile stopped by sync, showing clear button');
+      } else {
         if (temperatureInterval) {
           clearInterval(temperatureInterval);
           temperatureInterval = null;
         }
-        document.getElementById('graphControls').style.display = 'block';
+      }
+      
+      // Update profile selector to show active profile
+      if (uiState.active_profile_name && profileSelect.value !== uiState.active_profile_name) {
+        profileSelect.value = uiState.active_profile_name;
+      } else if (!uiState.active_profile_name) {
+        profileSelect.value = '';
       }
     }
 
@@ -75,40 +93,22 @@
           const targetDisplay = targetTemp !== '--' ? targetTemp + " °C" : "--";
           document.getElementById("currentTarget").innerText = targetDisplay;
 
-          // Handle graph synchronization across clients
-          try {
-            handleGraphSync(data);
-          } catch (error) {
-            console.warn('Graph sync error:', error);
+          // Simple state-driven UI updates using ProfileManager ui_state
+          if (data.ui_state) {
+            updateUIState(data.ui_state);
           }
 
-          // Update profile status if available
+          // Update profile status using ui_state
           try {
-            if (data.profile_status && typeof data.profile_status === 'object') {
-              const status = data.profile_status;
-              const statusText = status.active ? 
-                `Running: ${status.profile_name || 'Unknown'} (${status.current_phase || 'Unknown'})` : 
-                'Stopped';
+            if (data.ui_state && typeof data.ui_state === 'object') {
+              const status = data.ui_state;
+              const statusText = status.is_running ? 
+                `Running: ${status.active_profile_name || 'Unknown'} (${status.current_phase || 'Unknown'})` : 
+                (status.active_profile_name ? `Stopped: ${status.active_profile_name}` : 'No Profile Selected');
               document.getElementById("profileStatus").innerText = statusText;
               
-              // Check if profile just finished (was active, now inactive)
-              if (wasProfileActive && !status.active && temperatureChart) {
-                console.log('Profile completed, showing clear button');
-                if (temperatureInterval) {
-                  clearInterval(temperatureInterval);
-                  temperatureInterval = null;
-                }
-                document.getElementById('graphControls').style.display = 'block';
-              }
-              
-              // Update the tracking variable
-              wasProfileActive = status.active;
-              
-              // Update timer display
-              const timerDiv = document.getElementById("profileTimer");
-              if (status.active) {
-                timerDiv.style.display = "block";
-                
+              // Update timer fields if profile is active
+              if (status.active_profile_name) {
                 // Format time as MM:SS
                 const formatTime = (minutes) => {
                   const mins = Math.floor(minutes);
@@ -124,18 +124,14 @@
                 // Update progress bar
                 const progressFill = document.getElementById("progressFill");
                 progressFill.style.width = `${status.progress_percent || 0}%`;
-              } else {
-                timerDiv.style.display = "none";
               }
             } else {
-              // No profile status - ensure we show "Stopped"
-              document.getElementById("profileStatus").innerText = 'Stopped';
-              wasProfileActive = false;
+              // No profile status - ensure we show "No Profile Selected"
+              document.getElementById("profileStatus").innerText = 'No Profile Selected';
             }
           } catch (error) {
             console.warn('Profile status update error:', error);
-            document.getElementById("profileStatus").innerText = 'Stopped';
-            wasProfileActive = false;
+            document.getElementById("profileStatus").innerText = 'No Profile Selected';
           }
 
           // Update heater icon
@@ -197,6 +193,11 @@
     }
 
     function startProfile() {
+      const playBtn = document.getElementById("playBtn");
+      if (playBtn.classList.contains('disabled')) {
+        return; // Don't execute if disabled
+      }
+      
       const select = document.getElementById("profileSelect");
       const profileName = select.value;
       
@@ -205,23 +206,14 @@
         return;
       }
       
-      fetch('/profile/start?name=' + encodeURIComponent(profileName))
+      // Use the updated start endpoint
+      fetch(`/profile/${encodeURIComponent(profileName)}/start`, { method: 'POST' })
         .then(res => res.json())
         .then(data => {
           if (data.status === 'ok') {
             showFeedback(data.message, 'success');
-            console.log('Profile started, showing graph for:', profileName);
-            // Show graph and load profile data
-            currentGraphProfile = profileName;
-            loadProfileForGraph(profileName);
-            showTemperatureGraph();
-            isGraphSynced = false; // This was started locally, not synced
-            
-            // Start temperature graph updates
-            if (temperatureInterval) {
-              clearInterval(temperatureInterval);
-            }
-            temperatureInterval = setInterval(updateMeasuredTemperature, 12000); // Every 12 seconds
+            console.log('Profile started:', profileName);
+            // UI updates will be handled automatically by updateUIState via temperature polling
           } else {
             showFeedback(data.message || 'Error starting profile', 'error');
           }
@@ -233,14 +225,16 @@
     }
 
     function stopProfile() {
+      const stopBtn = document.getElementById("stopBtn");
+      if (stopBtn.classList.contains('disabled')) {
+        return; // Don't execute if disabled
+      }
+      
       console.log('Stop button clicked');
-      fetch('/profile/stop')
+      fetch('/profile/stop', { method: 'POST' })
         .then(response => {
-          console.log('Stop response status:', response.status, 'OK:', response.ok);
-          console.log('Response headers:', response.headers);
           if (!response.ok) {
             return response.text().then(text => {
-              console.error('Stop response error text:', text);
               throw new Error(`HTTP ${response.status}: ${text}`);
             });
           }
@@ -249,18 +243,7 @@
         .then(data => {
           console.log('Profile stopped successfully:', data);
           showFeedback(data.message || 'Profile stopped', 'success');
-          
-          if (temperatureInterval) {
-            console.log('Clearing temperature interval');
-            clearInterval(temperatureInterval);
-            temperatureInterval = null;
-          }
-          
-          if (temperatureChart) {
-            // Show the clear button instead of hiding the chart immediately
-            console.log('Showing clear button after manual stop');
-            document.getElementById('graphControls').style.display = 'block';
-          }
+          // UI updates will be handled automatically by updateUIState via temperature polling
         })
         .catch(error => {
           console.error('Error stopping profile:', error);
@@ -269,36 +252,37 @@
     }
 
     function clearGraph() {
-      if (temperatureChart) {
-        // Call server to clear the data
-        fetch('/profile/clear', { method: 'POST' })
-          .then(response => response.json())
-          .then(data => {
-            console.log('Graph data cleared on server:', data);
-            // Now clear the client-side graph
-            temperatureChart.destroy();
-            temperatureChart = null;
-            document.getElementById('temperatureGraphContainer').style.display = 'none';
-            document.getElementById('graphControls').style.display = 'none';
-            currentGraphProfile = '';
-            isGraphSynced = false;
-          })
-          .catch(error => {
-            console.error('Error clearing graph data:', error);
-            // Clear client-side anyway
-            temperatureChart.destroy();
-            temperatureChart = null;
-            document.getElementById('temperatureGraphContainer').style.display = 'none';
-            document.getElementById('graphControls').style.display = 'none';
-            currentGraphProfile = '';
-            isGraphSynced = false;
-          });
+      const clearBtn = document.getElementById("clearBtn");
+      if (clearBtn.classList.contains('disabled')) {
+        return; // Don't execute if disabled
       }
+      
+      // Use the new unified clear endpoint
+      fetch('/profile/clear', { method: 'POST' })
+        .then(response => response.json())
+        .then(data => {
+          if (data.status === 'ok') {
+            console.log('Profile cleared:', data);
+            showFeedback('Graph cleared', 'success');
+          } else {
+            throw new Error(data.message || 'Unknown error');
+          }
+          // UI updates will be handled automatically by updateUIState via temperature polling
+        })
+        .catch(error => {
+          console.error('Error clearing graph:', error);
+          showFeedback('Error clearing graph', 'error');
+        });
     }
 
     let phaseCounter = 0;
 
     function toggleProfileForm() {
+      const toggleFormBtn = document.getElementById("toggleFormBtn");
+      if (toggleFormBtn.classList.contains('disabled')) {
+        return; // Don't execute if disabled
+      }
+      
       const form = document.getElementById("profileForm");
       const btn = document.getElementById("toggleFormBtn");
       
@@ -490,7 +474,6 @@
     }
 
     // Temperature graphing functionality
-    let temperatureChart = null;
     let profileData = null;
 
     function createTemperatureChart() {
@@ -714,6 +697,40 @@
             loadProfiles();
             createTemperatureChart();
             interval = setInterval(updateTemp, 2000);
+            
+            // Add profile selection listener for activation
+            const profileSelect = document.getElementById('profileSelect');
+            profileSelect.addEventListener('change', function() {
+              const selectedProfile = this.value;
+              if (selectedProfile) {
+                // Activate the selected profile
+                fetch(`/profile/${encodeURIComponent(selectedProfile)}/activate`, { method: 'POST' })
+                  .then(res => res.json())
+                  .then(data => {
+                    if (data.status === 'ok') {
+                      console.log('Profile activated:', selectedProfile);
+                      showFeedback(`Profile "${selectedProfile}" selected`, 'success');
+                    } else {
+                      console.error('Profile activation failed:', data.message);
+                      showFeedback(data.message || 'Error selecting profile', 'error');
+                    }
+                  })
+                  .catch(error => {
+                    console.error('Error activating profile:', error);
+                    showFeedback('Network error selecting profile', 'error');
+                  });
+              } else {
+                // Deactivate if no profile selected
+                fetch('/profile/deactivate', { method: 'POST' })
+                  .then(res => res.json())
+                  .then(data => {
+                    console.log('Profile deactivated');
+                  })
+                  .catch(error => {
+                    console.error('Error deactivating profile:', error);
+                  });
+              }
+            });
           } else {
             console.error('Server connectivity: FAILED - HTTP', res.status);
             document.getElementById("profileStatus").innerText = `Server Error ${res.status}`;
@@ -778,25 +795,21 @@
             <div class="chart-container-compact">
               <canvas id="temperatureChart"></canvas>
             </div>
-            <div id="graphControls" class="graph-controls" style="display: none;">
-              <button id="clearButton" onclick="clearGraph()" class="clear-graph-btn">Clear Graph</button>
-            </div>
           </div>
         </div>
       </div>
       
-      <div class="profile-controls">
-        <select id="profileSelect">
-          <option value="">Select a profile...</option>
-        </select>
-      </div>
       
-      <div class="profile-actions">
-        <div class="control-buttons">
-          <button onclick="startProfile()" id="playBtn" class="control-btn play-btn">▶</button>
-          <button onclick="stopProfile()" id="stopBtn" class="control-btn stop-btn">⏸</button>
+      <div class="profile-controls">
+        <div class="control-buttons-row">
+          <select id="profileSelect" title="Select a temperature profile to activate">
+            <option value="">🔽 Select a profile...</option>
+          </select>
+          <button onclick="toggleProfileForm()" id="toggleFormBtn" class="control-btn" title="Create a new temperature profile">➕</button>
+          <button onclick="startProfile()" id="playBtn" class="control-btn" title="Run the active profile">▶️</button>
+          <button onclick="stopProfile()" id="stopBtn" class="control-btn" title="Stop the running profile">⏹️</button>
+          <button onclick="clearGraph()" id="clearBtn" class="control-btn" title="Clear graph data and deactivate profile">✖️</button>
         </div>
-        <button onclick="toggleProfileForm()" id="toggleFormBtn" class="create-profile-btn">Create New Profile</button>
       </div>
       
       <div class="profile-creator">

@@ -161,6 +161,28 @@ h1 {
   background-color: white;
 }
 
+.profile-controls {
+  margin-bottom: 1rem;
+}
+
+.control-buttons-row {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.control-buttons-row select {
+  flex: 1;
+  min-width: 200px;
+  padding: 0.6rem;
+  font-size: 1rem;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  background-color: white;
+}
+
 .control-btn {
   flex-shrink: 0;
   width: 40px;
@@ -181,34 +203,22 @@ h1 {
   background-color: #005fa3;
 }
 
-.profile-actions {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 1rem;
-  margin-bottom: 1rem;
-  flex-wrap: wrap;
+.control-btn.disabled {
+  background-color: #ccc !important;
+  color: #888 !important;
+  cursor: not-allowed !important;
+  pointer-events: none !important;
 }
 
-.control-buttons {
-  display: flex;
-  gap: 0.5rem;
+.control-btn.disabled:hover {
+  background-color: #ccc !important;
 }
 
-.create-profile-btn {
-  padding: 0.6rem 1.2rem;
-  font-size: 1rem;
-  background-color: #0077cc;
-  color: white;
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
-  transition: background-color 0.3s;
-  white-space: nowrap;
-}
-
-.create-profile-btn:hover {
-  background-color: #005fa3;
+/* Disabled select styling */
+select.disabled {
+  background-color: #f5f5f5 !important;
+  color: #888 !important;
+  cursor: not-allowed !important;
 }
 
 .profile-timer {
@@ -319,14 +329,14 @@ h1 {
     margin-top: 0.5rem;
   }
   
-  .profile-actions {
+  .control-buttons-row {
     flex-direction: column;
-    align-items: stretch;
     gap: 0.75rem;
   }
   
-  .control-buttons {
-    align-self: center;
+  .control-buttons-row select {
+    min-width: unset;
+    width: 100%;
   }
   
   .temperature-display {
