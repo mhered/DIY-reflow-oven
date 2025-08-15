@@ -111,8 +111,8 @@ We copy the library to the pico: `microdot.py`.
 ![](./assets/server_v2.png)
 
 ### Wiring
-| ![](./assets/thermistor_v2_bb.png) | ![](./assets/breadboard.jpg) |
-| ---------------------------------- | ---------------------------- |
+| ![](./assets/thermistor_v2_bb.png) | <img src="./assets/breadboard.jpg" style="zoom: 33%;" /> |
+| ---------------------------------- | -------------------------------------------------------- |
 
 ![](./assets/thermistor_v2_schem.png)
 
@@ -130,7 +130,22 @@ Next we refactor to add support for temperature profiles and disable manual targ
 
 ## Step 5 - Plot temperature graphs
 
+This is a test with simulated temperature
+
 ![](./assets/server_v4.png)
+
+## Step 5 - Optimize architecture
+
+Move state logic to `ProfileManager` class, put some order in the UI, improve set of example profiles etc.
+
+**Bulb Test 55 °C — Proof of Concept**
+
+The graph below shows a temperature profile recorded during a full system test in a simple proof-of-concept setup. An old incandescent bulb served as the heating element, switched by the Raspberry Pi Pico via a solid-state relay. To mimic an oven enclosure, the bulb and temperature sensor were covered with an inverted beer glass, allowing the air temperature to rise quickly to the 55 °C target.
+
+The small ripples in the measured temperature trace reflect the heater control loop cycling the bulb on and off to follow the requested profile. Towards the end of the test, the measured temperature fell behind the target curve because heat dissipation under the glass was not fast enough to achieve the desired cooling rate.
+
+| <img src="./assets/POC_setup.jpeg" style="zoom:25%;" /> | ![](./assets/Bulb_Test_55C.png) |
+| ------------------------------------------------------- | ------------------------------- |
 
 
 
