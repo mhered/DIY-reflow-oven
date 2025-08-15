@@ -77,6 +77,27 @@ class WebServer:
                 'status': 'ok',
                 'profiles': self.profile_manager.get_profile_names()
             }
+
+        @self.app.route('/constants')
+        def constants(request):
+            """ Get application constants from ProfileManager """
+            from profile_manager import (
+                POLLING_INTERVAL_SECONDS,
+                MAX_TEMPERATURE_POINTS,
+                TEMPERATURE_POINTS_TRIM_TO,
+                STATUS_PRINT_INTERVAL_SECONDS
+            )
+            
+            return {
+                'status': 'ok',
+                'constants': {
+                    'polling_interval_seconds': POLLING_INTERVAL_SECONDS,
+                    'polling_interval_ms': POLLING_INTERVAL_SECONDS * 1000,
+                    'max_temperature_points': MAX_TEMPERATURE_POINTS,
+                    'temperature_points_trim_to': TEMPERATURE_POINTS_TRIM_TO,
+                    'status_print_interval_seconds': STATUS_PRINT_INTERVAL_SECONDS
+                }
+            }
         @self.app.route('/profile/<profile_name>/activate', methods=['POST'])
         def activate_profile(request, profile_name):
             """ Activate a profile for execution """
@@ -178,17 +199,27 @@ class WebServer:
         
         @self.app.route('/temperature/data')
         def get_temperature_data(request):
-            """ Get temperature data for graphing """
+            """ Get temperature data for graphing with optional incremental updates """
             try:
+                # Check for incremental update request
+                since_time = request.args.get('since')
+                if since_time:
+                    try:
+                        since_time = float(since_time)
+                    except (ValueError, TypeError):
+                        since_time = None
+                
                 # Use ProfileManager's temperature data
                 if self.profile_manager.active_profile_name:
-                    temp_data_response = self.profile_manager.get_temperature_data()
+                    temp_data_response = self.profile_manager.get_temperature_data(since_time)
                     return {
                         'status': 'ok',
                         'data': temp_data_response['data'],  # Extract the actual data array
                         'profile_active': True,
                         'profile_name': self.profile_manager.active_profile_name,
-                        'is_running': self.profile_manager.is_running
+                        'is_running': self.profile_manager.is_running,
+                        'incremental': since_time is not None,
+                        'last_time': temp_data_response.get('last_time')  # For next incremental request
                     }
                 else:
                     return {
@@ -196,7 +227,9 @@ class WebServer:
                         'data': [],
                         'profile_active': False,
                         'profile_name': '',
-                        'is_running': False
+                        'is_running': False,
+                        'incremental': False,
+                        'last_time': None
                     }
             except Exception as e:
                 print("Error in temperature/data endpoint: {}".format(e))

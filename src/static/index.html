@@ -8,6 +8,10 @@
   <link rel="stylesheet" href="/style.css">
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script>
+    // Configuration Constants - will be loaded from server
+    let POLLING_INTERVAL_MS = 2000;  // Default, will be updated from server
+    let GRAPH_UPDATE_INTERVAL_MS = 2000;  // Default, will be updated from server
+    
     let interval = null;
     let temperatureInterval = null;
     let temperatureChart = null;
@@ -56,7 +60,7 @@
         if (!temperatureInterval) {
           // Start interval and call immediately
           updateMeasuredTemperature();
-          temperatureInterval = setInterval(updateMeasuredTemperature, 5000); // Reduced to 5 seconds
+          temperatureInterval = setInterval(updateMeasuredTemperature, GRAPH_UPDATE_INTERVAL_MS);
         }
       } else {
         if (temperatureInterval) {
@@ -68,8 +72,12 @@
       // Update profile selector to show active profile
       if (uiState.active_profile_name && profileSelect.value !== uiState.active_profile_name) {
         profileSelect.value = uiState.active_profile_name;
+        // Reset incremental tracking when profile changes
+        lastTemperatureTime = null;
       } else if (!uiState.active_profile_name) {
         profileSelect.value = '';
+        // Reset incremental tracking when no profile active
+        lastTemperatureTime = null;
       }
     }
 
@@ -638,10 +646,17 @@
       temperatureChart.update('none');
     }
 
+    let lastTemperatureTime = null; // Track last received temperature time for incremental updates
+
     function updateMeasuredTemperature() {
       if (!temperatureChart) return;
 
-      fetch('/temperature/data')
+      // Use incremental updates if we have a last time
+      const url = lastTemperatureTime ? 
+        `/temperature/data?since=${lastTemperatureTime}` : 
+        '/temperature/data';
+
+      fetch(url)
         .then(res => {
           if (!res.ok) {
             throw new Error('Network response was not ok');
@@ -650,23 +665,40 @@
         })
         .then(data => {
           if (data.status === 'ok' && data.profile_active) {
-            const measuredData = data.data.map(point => ({
+            const newMeasuredData = data.data.map(point => ({
               x: point.time,
               y: point.temperature
             }));
             
-            temperatureChart.data.datasets[1].data = measuredData;
-            temperatureChart.update('none');
+            if (data.incremental && newMeasuredData.length > 0) {
+              // Append new data points to existing chart data
+              temperatureChart.data.datasets[1].data.push(...newMeasuredData);
+              temperatureChart.update('none');
+              console.log(`Added ${newMeasuredData.length} new temperature points`);
+            } else if (!data.incremental && newMeasuredData.length > 0) {
+              // Full data load (initial or after reset)
+              temperatureChart.data.datasets[1].data = newMeasuredData;
+              temperatureChart.update('none');
+              console.log(`Loaded ${newMeasuredData.length} temperature points`);
+            }
+            
+            // Update last time for next incremental request
+            if (data.last_time !== null) {
+              lastTemperatureTime = data.last_time;
+            }
           } else if (!data.profile_active) {
-            // Just clear measured data when profile is not active, don't hide graph
-            temperatureChart.data.datasets[1].data = [];
-            temperatureChart.update('none');
-            // Don't call hideTemperatureGraph() here - let handleGraphSync manage it
+            // Profile not active - clear data and reset incremental tracking
+            if (temperatureChart.data.datasets[1].data.length > 0) {
+              temperatureChart.data.datasets[1].data = [];
+              temperatureChart.update('none');
+            }
+            lastTemperatureTime = null; // Reset for next profile
           }
         })
         .catch(error => {
           console.warn('Temperature data update failed (will retry):', error.message);
-          // Don't show user error for this - just log and continue
+          // Reset incremental tracking on error to force full reload next time
+          lastTemperatureTime = null;
         });
     }
 
@@ -684,24 +716,52 @@
       profileData = null;
     }
 
-    window.onload = () => {
-      // Test basic connectivity first
-      console.log('Testing server connectivity...');
-      fetch('/temperature')
+    function loadConstants() {
+      return fetch('/constants')
         .then(res => {
-          console.log('Server response status:', res.status);
-          if (res.ok) {
-            console.log('Server connectivity: OK');
-            // Server is working, start normal operations
-            updateTemp();
-            loadProfiles();
-            createTemperatureChart();
-            interval = setInterval(updateTemp, 2000);
-            
-            // Add profile selection listener for activation
-            const profileSelect = document.getElementById('profileSelect');
-            profileSelect.addEventListener('change', function() {
-              const selectedProfile = this.value;
+          if (!res.ok) {
+            throw new Error(`HTTP ${res.status}`);
+          }
+          return res.json();
+        })
+        .then(data => {
+          if (data.status === 'ok') {
+            // Update global constants from server
+            POLLING_INTERVAL_MS = data.constants.polling_interval_ms;
+            GRAPH_UPDATE_INTERVAL_MS = data.constants.polling_interval_ms; // Use same interval
+            console.log(`Constants loaded: polling=${POLLING_INTERVAL_MS}ms, graph=${GRAPH_UPDATE_INTERVAL_MS}ms`);
+          } else {
+            console.warn('Constants response error:', data);
+          }
+        })
+        .catch(error => {
+          console.warn('Error loading constants, using defaults:', error);
+          // Keep defaults (already set above)
+        });
+    }
+
+    window.onload = () => {
+      // Load constants first, then test connectivity
+      console.log('Loading constants from server...');
+      loadConstants()
+        .finally(() => {
+          // Test connectivity regardless of constants result
+          console.log('Testing server connectivity...');
+          fetch('/temperature')
+            .then(res => {
+              console.log('Server response status:', res.status);
+              if (res.ok) {
+                console.log('Server connectivity: OK');
+                // Server is working, start normal operations
+                updateTemp();
+                loadProfiles();
+                createTemperatureChart();
+                interval = setInterval(updateTemp, POLLING_INTERVAL_MS);
+                
+                // Add profile selection listener for activation
+                const profileSelect = document.getElementById('profileSelect');
+                profileSelect.addEventListener('change', function() {
+                  const selectedProfile = this.value;
               if (selectedProfile) {
                 // Activate the selected profile
                 fetch(`/profile/${encodeURIComponent(selectedProfile)}/activate`, { method: 'POST' })
@@ -747,6 +807,7 @@
           // Try to start basic chart anyway for when server comes online
           createTemperatureChart();
         });
+      });
     };
   </script>
 </head>

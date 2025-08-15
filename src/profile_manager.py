@@ -7,6 +7,15 @@ import os
 import time
 from profile import TemperatureProfile, TemperaturePhase, create_example_profiles, debug_print
 
+# Configuration Constants
+POLLING_INTERVAL_SECONDS = 2
+POLLING_INTERVAL_MINUTES = POLLING_INTERVAL_SECONDS / 60.0  # 0.033 minutes
+MAX_TEMPERATURE_POINTS = 350  # ~12 minutes at 2s intervals
+TEMPERATURE_POINTS_TRIM_TO = 300  # Keep 10 minutes when trimming
+STATUS_PRINT_INTERVAL_SECONDS = 30
+PRECISION_TIME_DECIMALS = 2
+PRECISION_TEMP_DECIMALS = 1
+
 
 class ProfileManager:
     """Manages temperature profile execution and state"""
@@ -196,8 +205,9 @@ class ProfileManager:
         # Get current target temperature
         phase_index, phase_name, target_temp = profile.get_current_phase_and_target(self.elapsed_minutes)
         
-        # Only print status every 30 seconds to avoid spam
-        if int(self.elapsed_minutes * 2) % 60 == 0:  # Every 30 seconds
+        # Only print status every STATUS_PRINT_INTERVAL_SECONDS to avoid spam
+        print_interval_minutes = STATUS_PRINT_INTERVAL_SECONDS / 60.0
+        if int(self.elapsed_minutes / print_interval_minutes) % 2 == 0:  # Every STATUS_PRINT_INTERVAL_SECONDS
             print("Profile '{}': {:.1f}min, {}, {:.1f}°C".format(
                 self.active_profile_name, self.elapsed_minutes, phase_name, target_temp))
         
@@ -323,8 +333,8 @@ class ProfileManager:
                 temp = phase.get_target_temp(time_in_phase)
                 
                 points.append({
-                    'time': round(absolute_time, 2),
-                    'temperature': round(temp, 1),
+                    'time': round(absolute_time, PRECISION_TIME_DECIMALS),
+                    'temperature': round(temp, PRECISION_TEMP_DECIMALS),
                     'phase': phase.name
                 })
                     
@@ -332,7 +342,7 @@ class ProfileManager:
         
         return {
             'name': profile.name,
-            'total_duration': round(total_minutes, 2),
+            'total_duration': round(total_minutes, PRECISION_TIME_DECIMALS),
             'points': points
         }
     
@@ -453,29 +463,46 @@ class ProfileManager:
         current_time = time.time()
         elapsed_minutes = (current_time - self.start_time) / 60.0
         
-        # Only collect data every 10 seconds to reduce memory usage (0.17 minutes)
+        # Collect data every POLLING_INTERVAL_SECONDS
         should_record = (len(self.temperature_data) == 0 or 
-                        elapsed_minutes - self.temperature_data[-1]['time'] >= 0.15)
+                        elapsed_minutes - self.temperature_data[-1]['time'] >= POLLING_INTERVAL_MINUTES)
         
         if should_record:
             self.temperature_data.append({
-                'time': round(elapsed_minutes, 2),
-                'temperature': round(temperature, 1)
+                'time': round(elapsed_minutes, PRECISION_TIME_DECIMALS),
+                'temperature': round(temperature, PRECISION_TEMP_DECIMALS)
             })
             
-            # Keep only recent data - limit for MicroPython memory
-            # Keep last 50 points (about 8-10 minutes of data at 10-second intervals)
-            if len(self.temperature_data) > 50:
-                self.temperature_data = self.temperature_data[-50:]
+            # Memory management: limit to MAX_TEMPERATURE_POINTS
+            if len(self.temperature_data) > MAX_TEMPERATURE_POINTS:
+                # Keep most recent TEMPERATURE_POINTS_TRIM_TO points
+                self.temperature_data = self.temperature_data[-TEMPERATURE_POINTS_TRIM_TO:]
     
-    def get_temperature_data(self):
-        """Get collected temperature data for graphing"""
-        return {
-            'status': 'ok',
-            'data': self.temperature_data,
-            'profile_active': self.active_profile_name is not None,
-            'profile_running': self.is_running
-        }
+    def get_temperature_data(self, since_time=None):
+        """Get collected temperature data for graphing with optional incremental updates"""
+        if since_time is not None:
+            # Return only data points after since_time
+            incremental_data = [point for point in self.temperature_data if point['time'] > since_time]
+            last_time = self.temperature_data[-1]['time'] if self.temperature_data else None
+            
+            return {
+                'status': 'ok',
+                'data': incremental_data,
+                'profile_active': self.active_profile_name is not None,
+                'profile_running': self.is_running,
+                'last_time': last_time
+            }
+        else:
+            # Return all data (initial load)
+            last_time = self.temperature_data[-1]['time'] if self.temperature_data else None
+            
+            return {
+                'status': 'ok',
+                'data': self.temperature_data,
+                'profile_active': self.active_profile_name is not None,
+                'profile_running': self.is_running,
+                'last_time': last_time
+            }
     
     def clear_temperature_data(self):
         """Clear temperature data (called by deactivate and start)"""
