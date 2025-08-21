@@ -1,6 +1,6 @@
 # DIY reflow oven
 
-Inspired in [this video](https://www.youtube.com/watch?v=asZ1zhef8Ss) (see also the [blog post](https://www.digikey.com/en/maker/projects/how-to-build-a-solder-reflow-oven/6c52df4782084f8d97c62d1349df058f)) but the BOM was too expensive
+Inspired in [this video](https://www.youtube.com/watch?v=asZ1zhef8Ss) (see also the [blog post](https://www.digikey.com/en/maker/projects/how-to-build-a-solder-reflow-oven/6c52df4782084f8d97c62d1349df058f)), but I thought the BOM was too expensive. I used also [this video](https://www.youtube.com/watch?v=k9xzGO0SVg0) as inspiration, which discusses temperature curves, and includes a custom controller PCB.
 
 Bought the following elements instead:
 
@@ -34,28 +34,29 @@ While I wait for the thermocouple to arrive by post I am building a proof of con
 
 ![](./assets/thermistor_bb.png)
 
+Check out the [fritzing model](./fritzing/diy_reflow_oven_v1.fzz)
+
 ### Firmware
 
 * `main.py` - main function
 * `display.py` - functions to send info to the OLED display  
-* `thermistor.py` -  functions to read the sensor
+* `thermistor.py` -  functions to read the sensor. Note I used a very simplified model of the variation of the thermistor's resistance with temperature using a single constant. This [Online Steinhart-Hart model coefficients calculator]( https://www.thinksrs.com/downloads/programs/therm%20calc/ntccalibrator/ntccalculator.html) provides a more accurate model but requires making R measurements at 3 known T points, which I felt was an overkill for the proof of concept.
 
-Copy dependencies to the pico:
+Copy dependencies to the Pico:
 
 * `ssd1306.py` - library to communicate with the OLED (copied from https://github.com/stlehmann/micropython-ssd1306)
-* `writer.py` - an interpreter for custom fonts for the OLED
-* `freesans20.py` - a custom large font for the OLED 
+* `writer.py` - an interpreter for custom fonts for the OLED  (copied from the link in the comments of this video: https://www.youtube.com/watch?v=bLXMVTTPFMs)
+* `freesans20.py` - a custom large font for the OLED  (copied from the link in the comments of this video: https://www.youtube.com/watch?v=bLXMVTTPFMs)
 
-Note: the files from https://github.com/peterhinch/micropython-font-to-py did not work for me, so I copied them instead from the link in the comments of this video: https://www.youtube.com/watch?v=bLXMVTTPFMs
+Note: the files from https://github.com/peterhinch/micropython-font-to-py did not work for me.
 
 ## Step 2  - setup a web server over WiFi to interact from computer or phone
 
-We profit from the capabilities of the RPi Pico to set up a  local web server over WifI to view temperature readings from a computer or phone connected to the same Wifi network as the Pico
+Profiting from the capabilities of the RPi Pico I decided to set up a local web server over Wifi to view temperature readings from a computer or phone connected to the same Wifi network as the Pico
 
 ### Firmware
 
-* `wifi.py` : function to connect the RPi Pico to Wifi
-* Need to upload to the Pico a `secrets.py`file containing the network information as follows:
+* `wifi.py` : function to connect the RPi Pico to Wifi. Requires uploading to the Pico a `secrets.py` file containing the network information as follows:
 
 ```bash
 SSID = "Network"
@@ -85,6 +86,8 @@ Dependencies: copy the library  `microdot.py` to the pico
 
 In preparation to control the heater we add an LED on GPIO22
 
+Check out the [fritzing model](./fritzing/diy_reflow_oven_v2.fzz)
+
 | ![](./assets/thermistor_v2_bb.png) | <img src="./assets/breadboard.jpg" style="zoom: 33%;" /> |
 | ---------------------------------- | -------------------------------------------------------- |
 
@@ -92,7 +95,7 @@ In preparation to control the heater we add an LED on GPIO22
 
 ## Step 4 - Temperature Profiles
 
-Next we refactor to add support for temperature profiles and disable manual target temperature setting.
+Next we refactor to add support for temperature profiles and disable manual target temperature setting:
 
 - `profile.py` - classes for multi-phase temperature control with JSON serialization
 - `profile_manager.py` functions to manage profile execution, file persistence, and state tracking
@@ -121,16 +124,17 @@ The small ripples in the measured temperature trace reflect the heater control l
 | <img src="./assets/POC_setup.jpeg" style="zoom:25%;" /> | ![](./assets/Bulb_Test_55C.png) |
 | ------------------------------------------------------- | ------------------------------- |
 
-## Step 6 - building the oven for real
+## Step 6 - (Finally) hacking the oven for real
 
 Two sanity checks on the Cecotec oven before we proceed:
 
-1. Confirmed if we unplug and plug the oven it resumes working (there is no electronics that reset the timer etc). This allows us controlling the heater in the oven as we did with the incandescent bulb in the proof of concept
-2. The lower tray for removing breadcrums is perfect to feed the wire of the thermocouple to get temperature measurements inside the oven without the need to drill a hole or modify the oven in any way.
+1. Two infrared heater pieces powerful enough (1000W) to quickly heat up and cool down
+2. Confirmed that if we shut down and power up again the oven it resumes working (there are no electronics that reset the timer etc). This allows us controlling the oven as we did with the incandescent bulb in the proof of concept.
+3. The lower tray for removing breadcrumbs is perfect to feed the wire of the thermocouple to get temperature measurements inside the oven without the need to drill a hole or modify the oven in any way.
 
 ### Firmware
 
-Next we need to adapt the code for the K-type thermocouple and MAX6675 ref. [this tutorial](https://www.electroniclinic.com/raspberry-pi-pico-and-max6675-based-industrial-temperature-monitoring-system/)
+Next we need to adapt the code for the K-type thermocouple and MAX6675. Refer to [this tutorial](https://www.electroniclinic.com/raspberry-pi-pico-and-max6675-based-industrial-temperature-monitoring-system/).
 
 
 
@@ -138,10 +142,4 @@ Next we need to adapt the code for the K-type thermocouple and MAX6675 ref. [thi
 
 - [ ] created branch `feature/polling-improvements-WIP` with partial implementation of incremental temperature updates instead of full dumps for the graph to enable higher refresh rates without memory problems, and to configure the refresh of different elements such as the graph, measured and target temperatures, UI buttons states, etc using centralized named constants instead of magic numbers scattered throughout the code
 - [ ] check also open issues
-
-## Sources
-
-* [Online Steinhart-Hart model coefficients calculator]( https://www.thinksrs.com/downloads/programs/therm%20calc/ntccalibrator/ntccalculator.html) - needs R measurements at 3 known T points
-
-* [Another video](https://www.youtube.com/watch?v=k9xzGO0SVg0) -  discusses temp curves, has a custom controller PCB
 
