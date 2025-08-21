@@ -4,49 +4,27 @@ Inspired in [this video](https://www.youtube.com/watch?v=asZ1zhef8Ss) (see also 
 
 Bought the following elements instead:
 
-| Qty  | Item                                                         | Image                        | Description                                                  | Link                                          | Pack Price (€) | Pack Size | Unit Price (€) | Subtotal (€) |
-| ---- | ------------------------------------------------------------ | ---------------------------- | ------------------------------------------------------------ | --------------------------------------------- | -------------- | --------- | -------------- | ------------ |
-| 1    | [ARCELI MAX6675 module + K-type thermocouple](./BOM/sensor.md) | ![](./BOM/assets/sensor.jpg) | K-type thermocouple module with MAX6675, 0–600 °C range, SPI output | [Amazon](https://www.amazon.es/dp/B07MY36P9Y) | 7.99           | 1         | 7.99           | 7.99         |
-| 1    | [SSR-50DA Solid State Relay](./BOM/ssr.md)                   | ![](./BOM/assets/SSR.jpg)    | DC 3–32 V input, AC 24–380 V output, 50A max, for heater control | [Amazon](https://www.amazon.es/dp/B08FX1DDJM) | 9.59           | 1         | 9.59           | 9.59         |
-| 1    | [Cecotec Bake&Toast 1090 Oven](./BOM/oven.md)                | ![](./BOM/assets/oven.jpg)   | 10 L tabletop oven, 1000 W, 60 min timer, up to 230 °C       | [Amazon](https://www.amazon.es/dp/B0BQ13YSVT) | 31.90          | 1         | 31.90          | 31.90        |
-| 1    | Raspberry Pico WH                                            |                              |                                                              |                                               |                |           |                |              |
-| 1    | SSD1306 OLED                                                 |                              |                                                              |                                               |                |           |                |              |
+| Qty  | Item                                                         | Image                                      | Description                                                  | Link                                          | Pack Price (€) | Pack Size | Unit Price (€) | Subtotal (€) |
+| ---- | ------------------------------------------------------------ | ------------------------------------------ | ------------------------------------------------------------ | --------------------------------------------- | -------------- | --------- | -------------- | ------------ |
+| 1    | [ARCELI MAX6675 module + K-type thermocouple](./BOM/sensor.md) | ![](./BOM/assets/sensor.jpg)               | K-type thermocouple module with MAX6675, 0–600 °C range, SPI output | [Amazon](https://www.amazon.es/dp/B07MY36P9Y) | 7.99           | 1         | 7.99           | 7.99         |
+| 1    | [SSR-50DA Solid State Relay](./BOM/ssr.md)                   | ![](./BOM/assets/SSR.jpg)                  | DC 3–32 V input, AC 24–380 V output, 50A max, for heater control | [Amazon](https://www.amazon.es/dp/B08FX1DDJM) | 9.59           | 1         | 9.59           | 9.59         |
+| 1    | [Cecotec Bake&Toast 1090 Oven](./BOM/oven.md)                | ![](./BOM/assets/oven.jpg)                 | 10 L tabletop oven, 1000 W, 60 min timer, up to 230 °C       | [Amazon](https://www.amazon.es/dp/B0BQ13YSVT) | 31.90          | 1         | 31.90          | 31.90        |
+| 1    | [Raspberry Pi Pico WH](BOM/RPi_Pico.md)                      | ![](./BOM/assets/raspberry_pi_pico_WH.jpg) |                                                              |                                               |                |           |                |              |
+| 1    | [SSD1306 OLED](./BOM/OLED.md)                                | ![](./BOM/assets/OLED.jpg)                 |                                                              |                                               |                |           |                |              |
 
-Also used a Raspberry Pico WH and a SSD1306 OLED screen I had around
+I already had the Raspberry Pico WH and SSD1306 OLED screen laying around.
 
-## Step 1 - Measure temp and show it on the OLED
+See [BOM/RPi_Pico.md](BOM/RPi_Pico.md) for  instructions on how to flash micropython on to the Raspberry Pi Pico and details of the pinout.
+
+## Step 1 - Measure temperature and show it on the OLED
 
 Target: display the temperature on the OLED using a MicroPython script
 
 Inspired in this source video: https://www.youtube.com/watch?v=aUPvASe8D-w
 
-### Flashing MicroPython onto the Pico
+### Wiring
 
-I used [Thonny](https://thonny.org/) (a python IDE for beginners with great MicroPython integration). 
-
-1. Install and run:
-
-```bash
-$ sudo apt install thonny
-$ thonny
-```
-
-2. plug the RPi Pico in boot mode: while holding down the **BOOTSEL** button on the RPi Pico, connect the USB cable to your computer, and a new drive will appear: **RPI-RP2**
-
-3. flash MicroPython on the RPi Pico: 
-   1. Go to **Tools** > **Options**
-   2. In the **Interpreter** tab select **"MicroPython (Raspberry Pi Pico)"** in the dropdown and click **"Install or update MicroPython"**. Thonny will detect the RPi Pico automatically. 
-   3. Select variant **"Raspberry Pi Pico W / Pico WH"**. It will download and flash the **MicroPython UF2 file** automatically.
-   4. Click **Install** and wait for it to finish![](./assets/install_micropython.png)
-   5. After install, the RPi Pico will reboot and connect directly to Thonny — you’ll see the MicroPython REPL (>>>) at the bottom.
-
-
-
-### RPi Pico WH pinout
-
-![](./assets/pico-2-pinout.svg)
-
-### Wiring the voltage divider
+While I wait for the thermocouple to arrive by post I am building a proof of concept using a 10K thermistor and a 10kOhms resistor from my trusted [Freenove_Ultimate_Starter_Kit_for_Raspberry_Pi](https://github.com/Freenove/Freenove_Ultimate_Starter_Kit_for_Raspberry_Pi), wired in a voltage divider configuration as shown below (actually one of the tutorials in this repo demonstrates this application).
 
 ```
 3.3V --- [10kΩ] ---+--- [10K Thermistor] --- GND
@@ -54,22 +32,11 @@ $ thonny
                 GPIO26 (ADC 0)
 ```
 
-### Wiring the SSD1306 OLED to the Pico
-
-| OLED Pin | Connect To Pico | Pico Pin Number | Function |
-| -------- | --------------- | --------------- | -------- |
-| `VCC`    | 3.3V            | Pin 36          | Power    |
-| `GND`    | GND             | Pin 38 or 3     | Ground   |
-| `SCK`    | GP1             | Pin 2           | I²C0 SCL |
-| `SDA`    | GP0             | Pin 1           | I²C0 SDA |
-
-### Wiring
-
 ![](./assets/thermistor_bb.png)
 
-### Pico Firmware
+### Firmware
 
-* `main.py` - main function.
+* `main.py` - main function
 * `display.py` - functions to send info to the OLED display  
 * `thermistor.py` -  functions to read the sensor
 
@@ -83,21 +50,25 @@ Note: the files from https://github.com/peterhinch/micropython-font-to-py did no
 
 ## Step 2  - setup a web server over WiFi to interact from computer or phone
 
+We profit from the capabilities of the RPi Pico to set up a  local web server over WifI to view temperature readings from a computer or phone connected to the same Wifi network as the Pico
+
+### Firmware
+
 * `wifi.py` : function to connect the RPi Pico to Wifi
-* `secrets.py`: contains network information
+* Need to upload to the Pico a `secrets.py`file containing the network information as follows:
 
 ```bash
 SSID = "Network"
 PASSWORD = "Password"
 ```
 
-* `server.py` :  a very basic web server
+* `server.py` :  a very basic web server that just publishes the temperature every 2 seconds
 
 ![](./assets/server_v1.png)
 
 ## Step 3 - Control the heater
 
-Next we refactor using [Microdot](https://github.com/miguelgrinberg/microdot) framework and add a few improvements:
+Next we refactor using the [Microdot](https://github.com/miguelgrinberg/microdot) framework and add a few improvements:
 
 * Replace repeated full-page reload every 2 seconds using meta-refresh with polling a tiny JSON file using Java Script. This is more efficient, avoids page flicker and is more extensible 
 * Save web page as static files (`index.html` and `style.css`) with a minimalistic, modern design
@@ -106,11 +77,14 @@ Next we refactor using [Microdot](https://github.com/miguelgrinberg/microdot) fr
 
 * `heater.py` - contains the target temperature logic and functions to control a heater in GPIO22
 
-We copy the library to the pico: `microdot.py`.
+Dependencies: copy the library  `microdot.py` to the pico
 
 ![](./assets/server_v2.png)
 
 ### Wiring
+
+In preparation to control the heater we add an LED on GPIO22
+
 | ![](./assets/thermistor_v2_bb.png) | <img src="./assets/breadboard.jpg" style="zoom: 33%;" /> |
 | ---------------------------------- | -------------------------------------------------------- |
 
@@ -140,19 +114,34 @@ Move state logic to `ProfileManager` class, put some order in the UI, improve se
 
 **Bulb Test 55 °C — Proof of Concept**
 
-The graph below shows a temperature profile recorded during a full system test in a simple proof-of-concept setup. An old incandescent bulb served as the heating element, switched by the Raspberry Pi Pico via a solid-state relay. To mimic an oven enclosure, the bulb and temperature sensor were covered with an inverted beer glass, allowing the air temperature to rise quickly to the 55 °C target.
+The graph below shows a temperature profile recorded during a full system test in a simple proof-of-concept setup. An old incandescent bulb served as the heating element, switched by the Raspberry Pi Pico via a solid-state relay connected to GPIO22 . To mimic an oven enclosure, the bulb and temperature sensor were covered with an inverted beer glass, allowing the air temperature to rise quickly to the 55 °C target.
 
 The small ripples in the measured temperature trace reflect the heater control loop cycling the bulb on and off to follow the requested profile. Towards the end of the test, the measured temperature fell behind the target curve because heat dissipation under the glass was not fast enough to achieve the desired cooling rate.
 
 | <img src="./assets/POC_setup.jpeg" style="zoom:25%;" /> | ![](./assets/Bulb_Test_55C.png) |
 | ------------------------------------------------------- | ------------------------------- |
 
+## Step 6 - building the oven for real
 
+Two sanity checks on the Cecotec oven before we proceed:
+
+1. Confirmed if we unplug and plug the oven it resumes working (there is no electronics that reset the timer etc). This allows us controlling the heater in the oven as we did with the incandescent bulb in the proof of concept
+2. The lower tray for removing breadcrums is perfect to feed the wire of the thermocouple to get temperature measurements inside the oven without the need to drill a hole or modify the oven in any way.
+
+### Firmware
+
+Next we need to adapt the code for the K-type thermocouple and MAX6675 ref. [this tutorial](https://www.electroniclinic.com/raspberry-pi-pico-and-max6675-based-industrial-temperature-monitoring-system/)
+
+
+
+## WIP
+
+- [ ] created branch `feature/polling-improvements-WIP` with partial implementation of incremental temperature updates instead of full dumps for the graph to enable higher refresh rates without memory problems, and to configure the refresh of different elements such as the graph, measured and target temperatures, UI buttons states, etc using centralized named constants instead of magic numbers scattered throughout the code
+- [ ] check also open issues
 
 ## Sources
 
-* [Freenove_Ultimate_Starter_Kit_for_Raspberry_Pi](https://github.com/Freenove/Freenove_Ultimate_Starter_Kit_for_Raspberry_Pi) - a kit I use, the repo has tutorials, specs of the components etc 
-
 * [Online Steinhart-Hart model coefficients calculator]( https://www.thinksrs.com/downloads/programs/therm%20calc/ntccalibrator/ntccalculator.html) - needs R measurements at 3 known T points
+
 * [Another video](https://www.youtube.com/watch?v=k9xzGO0SVg0) -  discusses temp curves, has a custom controller PCB
 
