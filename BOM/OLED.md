@@ -38,7 +38,7 @@ Note: the files from https://github.com/peterhinch/micropython-font-to-py did no
 
 * A tool to design pixelart: https://www.pixilart.com/
 
-![](/home/mhered/sevillabot/BOM/assets/pixelart.png)
+![](./assets/pixelart.png)
 
 * Check out wokwi online emulator https://wokwi.com/ for Arduino, ESP32 and Raspberry Pi Pico and animation maker https://animator.wokwi.com/
 
