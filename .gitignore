@@ -1,2 +1,5 @@
 secrets.py
 __pycache__/
+.vscode/
+.venv/
+.micropico

@@ -3,7 +3,12 @@ import time
 
 from display import Display
 from server import WebServer
+
 from thermistor import Thermistor
+from simulated_sensor import SimulatedSensor
+from max6675 import MAX6675
+from machine import Pin
+
 from heater import Heater
 from wifi import connect
 from profile import set_profile_debug
@@ -12,9 +17,28 @@ from profile import set_profile_debug
 DEBUG_MODE = False  # Change to True for debug output
 set_profile_debug(DEBUG_MODE)
 
+
+# choose type of temperature sensor
+
+class SensorType:
+    THERMISTOR = 1
+    MAX6675 = 2
+    SIMULATED = 3
+
+sensor_type = SensorType.MAX6675
+
 # initialize temperature sensor
-SENSOR_PIN = None # 26 to use a physical sensor, None to simulate temp readings
-sensor = Thermistor(pin = SENSOR_PIN)
+
+if sensor_type == SensorType.SIMULATED:
+    simulated_sensor = SimulatedSensor()
+elif sensor_type == SensorType.THERMISTOR:
+    SENSOR_PIN = 26  # 26 to use a physical sensor
+    thermistor_sensor = Thermistor(pin=SENSOR_PIN)
+elif sensor_type == SensorType.MAX6675:
+    sck = Pin(13, Pin.OUT) # orange cable
+    cs = Pin(14, Pin.OUT) # yellow cable
+    so = Pin(15, Pin.IN) # green cable
+    max6675_sensor = MAX6675(sck, cs , so)
 
 # initialize heater controller
 HEATER_PIN = 22 # 22 to use a physical heater, None to simulate
@@ -43,28 +67,20 @@ server = WebServer(heater)
 
 time.sleep(5)
 
-# Temperature Simulation parameters
-AMBIENT_TEMP = 25 	# C
-NOISE = 0.1 		# C
-HEATING = 0.5 		# C/sec
-COOLING_K = 0.08 		# Newton's cooling constant
-
-temperature = AMBIENT_TEMP  # Start at ambient temperature
-
 # Time to wait between temperature updates
 WAIT = 1 			# sec
 
 # Main loop
 while True:
-    if sensor.pin is None:
-        # If no sensor, simulate temperature with random noise and heating / cooling
-        temperature += NOISE * (random.random() - 0.5) * 2
-        if heater.is_on:
-            temperature += HEATING
-        else:
-            temperature -= COOLING_K * (temperature - AMBIENT_TEMP)
-    else:
-        temperature = sensor.read_temp()
+    if sensor_type == SensorType.SIMULATED:
+        # Simulate temperature reading
+        temperature = simulated_sensor.simu_temp(heater.is_on)
+    elif sensor_type == SensorType.THERMISTOR:
+        # Read temperature from thermistor
+        temperature = thermistor_sensor.read_temp()
+    elif sensor_type == SensorType.MAX6675:
+        # Read temperature from MAX6675
+        temperature = max6675_sensor.read()
 
     # Use heater class to control heating logic - heater now manages its own target
     # Check if profile manager has an active profile and update target accordingly
@@ -88,6 +104,6 @@ while True:
     server.serve_heater_state_once(heater_on)
 
     # in stdout
-    print("Temp:", temperature)
+    print("Temp: {:.2f} C".format(temperature))
 
     time.sleep(WAIT)
