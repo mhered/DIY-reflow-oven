@@ -1,29 +1,29 @@
 {
-  "name": "Sn42Bi57Ag1 Low Temperature Solder Paste",
+  "name": "Sn42Bi57 Low Temp Solder Paste",
   "phases": [
     {
       "name": "Ramp",
-      "start_temp": 25,
-      "end_temp": 110,
-      "duration_minutes": 3
+      "start_temp": 25.0,
+      "end_temp": 110.0,
+      "duration_minutes": 3.0
     },
     {
       "name": "Soak",
-      "start_temp": 110,
-      "end_temp": 130,
-      "duration_minutes": 3
+      "start_temp": 110.0,
+      "end_temp": 130.0,
+      "duration_minutes": 3.0
     },
     {
       "name": "Reflow",
-      "start_temp": 130,
-      "end_temp": 170,
-      "duration_minutes": 1
+      "start_temp": 130.0,
+      "end_temp": 170.0,
+      "duration_minutes": 1.0
     },
     {
       "name": "Cool",
-      "start_temp": 170,
-      "end_temp": 80,
-      "duration_minutes": 2
+      "start_temp": 170.0,
+      "end_temp": 80.0,
+      "duration_minutes": 2.0
     }
   ]
 }

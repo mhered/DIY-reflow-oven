@@ -1,10 +1,4 @@
-"""
-Temperature Profile Management for Reflow Oven
-Handles temperature profiles with multiple phases
-"""
-
 import json
-import time
 
 # Global debug flag - can be set from main.py
 DEBUG_PROFILES = False
@@ -51,28 +45,39 @@ class TemperaturePhase:
     @classmethod
     def from_dict(cls, data):
         """Create phase from dictionary"""
-        return cls(
-            name=data['name'],
-            start_temp=data['start_temp'],
-            end_temp=data['end_temp'],
-            duration_minutes=data['duration_minutes']
-        )
+        try:
+            return cls(
+                name=data['name'],
+                start_temp=data['start_temp'],
+                end_temp=data['end_temp'],
+                duration_minutes=data['duration_minutes']
+            )
+        except KeyError as e:
+            debug_print("Missing required field: {}".format(e))
+            raise
+        except Exception as e:
+            debug_print("Error creating phase: {}".format(e))
+            raise
 
 
 class TemperatureProfile:
     """Represents a complete temperature profile with multiple phases"""
     
     def __init__(self, name, phases):
-        debug_print("Starting TemperatureProfile.__init__ for '{}'".format(name))
-        self.name = name
+        # Store original long name
+        self.display_name = name
+        # Create shorter name for UI and URLs
+        self.name = self._make_short_name(name)
         self.phases = phases
         self.total_duration = sum(phase.duration_minutes for phase in phases)
         self.validate()
-        debug_print("TemperatureProfile.__init__ completed for '{}'".format(name))
+    
+    def _make_short_name(self, name):
+        """Generate a shorter name by clipping to 20 characters if needed"""
+        return name[:20] if len(name) > 20 else name
     
     def validate(self):
         """Validate profile consistency"""
-        debug_print("Validating profile consistency")
         if not self.phases:
             raise ValueError("Profile must have at least one phase")
         
@@ -83,7 +88,6 @@ class TemperatureProfile:
             if abs(current_end - next_start) > 0.1:  # 0.1°C tolerance
                 print("Warning: Phase '{}' ends at {}°C but next phase '{}' starts at {}°C".format(
                     self.phases[i].name, current_end, self.phases[i+1].name, next_start))
-        debug_print("Profile validation completed")
     
     def get_current_phase_and_target(self, elapsed_minutes):
         """
@@ -111,68 +115,39 @@ class TemperatureProfile:
     
     def to_dict(self):
         """Convert profile to dictionary for JSON serialization"""
-        debug_print("Converting profile '{}' to dictionary".format(self.name))
         try:
-            phases_list = []
-            for i, phase in enumerate(self.phases):
-                debug_print("Converting phase {}: {}".format(i, phase.name))
-                phase_dict = phase.to_dict()
-                phases_list.append(phase_dict)
-            
-            result = {
-                'name': self.name,
+            phases_list = [phase.to_dict() for phase in self.phases]
+            return {
+                'name': self.display_name,  # Store full name in JSON
                 'phases': phases_list
             }
-            debug_print("Profile '{}' converted to dict successfully".format(self.name))
-            return result
         except Exception as e:
-            print("Error in to_dict for profile '{}': {}".format(self.name, e))
+            print("Error converting profile to dict: {}".format(e))
             raise
     
     @classmethod
     def from_dict(cls, data):
         """Create profile from dictionary"""
-        debug_print("Creating profile from dict: {}".format(data['name']))
-        phases = []
-        for i, phase_data in enumerate(data['phases']):
-            debug_print("Creating phase {}: {}".format(i, phase_data['name']))
-            phase = TemperaturePhase.from_dict(phase_data)
-            phases.append(phase)
-        debug_print("Created {} phases for profile '{}'".format(len(phases), data['name']))
-        
-        # Bypass __init__ completely and manually set attributes to avoid MicroPython recursion bug
         try:
-            # Create instance manually without calling __init__
-            result = object.__new__(cls)
-            debug_print("Created object instance for profile '{}'".format(data['name']))
+            phases = []
+            for phase_data in data.get('phases', []):
+                phase = TemperaturePhase.from_dict(phase_data)
+                phases.append(phase)
             
-            # Manually set all attributes that __init__ would set
-            result.name = data['name']
-            result.phases = phases
-            result.total_duration = sum(phase.duration_minutes for phase in phases)
-            
-            # Manually validate (inline the validation logic)
-            if not result.phases:
-                raise ValueError("Profile must have at least one phase")
-            
-            # Check phase continuity manually
-            for i in range(len(result.phases) - 1):
-                current_end = result.phases[i].end_temp
-                next_start = result.phases[i + 1].start_temp
-                if abs(current_end - next_start) > 0.1:  # 0.1°C tolerance
-                    print("Warning: Phase '{}' ends at {}°C but next phase '{}' starts at {}°C".format(
-                        result.phases[i].name, current_end, result.phases[i+1].name, next_start))
-            
-            debug_print("Profile '{}' created successfully from dict".format(data['name']))
+            result = cls(data['name'], phases)
+            # Show a summary of the phases
+            debug_print("Loaded profile: {} ({} phases)".format(data['name'], len(phases)))
+            for i, phase in enumerate(phases):
+                debug_print("  Phase {}: {} ({} -> {}°C, {}min)".format(
+                    i+1, phase.name, phase.start_temp, phase.end_temp, phase.duration_minutes))
             return result
         except Exception as e:
-            print("Error creating profile '{}' from dict: {}".format(data['name'], e))
+            print("Error loading profile: {}".format(e))
             raise
     
     def save_to_file(self, directory):
         """Save profile to JSON file in specified directory"""
         try:
-            debug_print("Saving profile '{}' to directory '{}'".format(self.name, directory))
             # Create filename from profile name
             filename = self.name.replace(' ', '_').replace('/', '_') + '.json'
             filepath = directory + '/' + filename
@@ -191,27 +166,26 @@ class TemperatureProfile:
             except Exception:
                 pass  # Ignore if sync is not available
                 
-            debug_print("Profile '{}' saved successfully to '{}'".format(self.name, filepath))
+            debug_print("Saved profile: {} to {}".format(self.name, filename))
         except Exception as e:
-            print("Error saving profile '{}': {}".format(self.name, e))
+            print("Error saving profile: {}".format(e))
             raise
     
     @classmethod
     def load_from_file(cls, filepath):
         """Load profile from JSON file - MicroPython compatible"""
         try:
-            debug_print("Loading profile from file: {}".format(filepath))
             with open(filepath, 'r') as f:
                 content = f.read()
                 if not content.strip():
                     raise ValueError("File is empty")
                 data = json.loads(content)
-            debug_print("Loaded profile '{}' from file".format(data['name']))
-            result = cls.from_dict(data)
-            debug_print("Profile '{}' loaded successfully".format(data['name']))
-            return result
+            debug_print("Loading profile: {} from {}".format(
+                data.get('name', 'NO NAME'),
+                filepath.split('/')[-1]))
+            return cls.from_dict(data)
         except Exception as e:
-            print("Error loading profile from {}: {}".format(filepath, e))
+            print("Error loading profile: {}".format(e))
             raise
 
 
