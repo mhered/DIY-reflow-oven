@@ -14,7 +14,7 @@ class Thermistor:
     - t0 (float): Reference temperature in Kelvin (default: 25°C > 298.15K)
     """
 
-    def __init__(self, pin=None, vcc=3.3, series_resistor=10000, beta=3950, r0=10000, t0=25 + 273.15):
+    def __init__(self, pin=26, vcc=3.3, series_resistor=10000, beta=3950, r0=10000, t0=25 + 273.15):
         self.pin = pin
         if self.pin:
             self.adc = ADC(pin)

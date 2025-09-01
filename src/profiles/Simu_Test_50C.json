@@ -1,1 +1,23 @@
-{"name": "Simu Test 50C", "phases": [{"duration_minutes": 1.0, "end_temp": 50.0, "name": "Ramp", "start_temp": 25.0}, {"duration_minutes": 1.0, "end_temp": 50.0, "name": "Hold", "start_temp": 50.0}, {"duration_minutes": 2.0, "end_temp": 30.0, "name": "Cool", "start_temp": 50.0}]}
+{
+    "name": "Simu Test 50C",
+    "phases": [
+        {
+            "duration_minutes": 1.0,
+            "end_temp": 50.0,
+            "name": "Ramp",
+            "start_temp": 25.0
+        },
+        {
+            "duration_minutes": 1.0,
+            "end_temp": 50.0,
+            "name": "Hold",
+            "start_temp": 50.0
+        },
+        {
+            "duration_minutes": 2.0,
+            "end_temp": 30.0,
+            "name": "Cool",
+            "start_temp": 50.0
+        }
+    ]
+}
