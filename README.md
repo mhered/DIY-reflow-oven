@@ -142,4 +142,6 @@ Next we need to adapt the code for the K-type thermocouple and MAX6675. Refer to
 
 - [ ] created branch `feature/polling-improvements-WIP` with partial implementation of incremental temperature updates instead of full dumps for the graph to enable higher refresh rates without memory problems, and to configure the refresh of different elements such as the graph, measured and target temperatures, UI buttons states, etc using centralized named constants instead of magic numbers scattered throughout the code
 - [ ] check also open issues
+- [x] test the oven and reflow first part
+- [ ] add pictures and gifs
 
