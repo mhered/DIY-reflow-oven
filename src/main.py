@@ -68,7 +68,7 @@ server = WebServer(heater)
 time.sleep(5)
 
 # Time to wait between temperature updates
-WAIT = 1 			# sec
+WAIT = 0.5 			# sec
 
 # Main loop
 while True:
